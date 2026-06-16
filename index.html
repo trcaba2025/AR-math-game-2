@@ -6,7 +6,7 @@
     <title>เกม AR บล็อกตัวเลขแสนสนุก</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -114,17 +114,11 @@ let blocks = [];
 let gameState = 'PLAYING'; 
 let feedbackTimer = 0;
 
-// ===================================================
-// [ปรับปรุง] ตั้งขนาดปุ่มยืนยันให้กะทัดรัดขึ้นเพื่อให้ขยับมาใกล้บล็อกได้พอดี
-// ===================================================
-let confirmBtn = { 
-    x: 0,           // พิกัดแนวนอน (จะคำนวณให้อยู่ใต้บล็อกตัวเลขแรกๆ ในฟังก์ชัน resizeCanvas)
-    y: 0,           // พิกัดแนวตั้ง 
-    w: 110,         // ความกว้างปุ่ม 110 พิกเซล
-    h: 110,         // ความสูงปุ่ม 110 พิกเซล
-    hovered: false, 
-    hoverProgress: 0 
-};
+// ==========================================
+// กลับมาใช้โครงสร้างปุ่มคู่ ซ้าย-ขวา ตามเดิมครับ
+// ==========================================
+let leftBtn = { x: 0, y: 0, w: 110, h: 110, hovered: false, hoverProgress: 0 };
+let rightBtn = { x: 0, y: 0, w: 110, h: 110, hovered: false, hoverProgress: 0 };
 
 let draggedBlockIndex = null;
 let pinchThreshold = 0.04; 
@@ -170,12 +164,15 @@ function generateQuestion() {
     });
 
     // ===================================================
-    // [จุดแก้ไขสำคัญ] ดึงปุ่มขึ้นสูงและขยับเข้ามาให้อยู่ใต้แถวตัวเลข
+    // [จุดแก้ไขเรื่องตำแหน่ง] ขยับปุ่มคู่เข้ามาด้านในและยกสูงขึ้น
     // ===================================================
-    // วางปุ่มให้อยู่ใต้บล็อกตัวเลขตัวที่ 2 (index 1) เพื่อให้ขยับเข้ามากลางจอที่กล้องเห็นมือชัดเจน
-    confirmBtn.x = startX + (1 * (BLOCK_WIDTH + spacing)) - 10;
-    // ให้ปุ่มอยู่ห่างลงมาจากใต้บล็อกตัวเลขเพียง 50 พิกเซลเท่านั้น (ใกล้และสูงพ้นขอบล่างแน่นอน)
-    confirmBtn.y = startY + BLOCK_HEIGHT + 50; 
+    // ปุ่มซ้าย: ขยับเข้ามาตั้งหลักห่างจากบล็อกตัวแรกนิดหน่อย และให้สูงขึ้นมาใต้แถวตัวเลขพอดี
+    leftBtn.x = startX - 130;
+    leftBtn.y = startY + BLOCK_HEIGHT + 30;
+
+    // ปุ่มขวา: ขยับเข้ามาด้านขวาของบล็อกตัวสุดท้าย
+    rightBtn.x = startX + totalWidth + 20;
+    rightBtn.y = startY + BLOCK_HEIGHT + 30;
 }
 
 function checkAnswer() {
@@ -229,8 +226,9 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillText(labelText, canvasElement.width / 2, 31);
 
-    // 2. วาดปุ่มวงกลมส้มในพิกัดใหม่ที่ยกสูงขึ้นและใกล้แถวตัวเลข
-    drawConfirmButton(confirmBtn);
+    // 2. วาดปุ่มยืนยันทั้งสองฝั่ง (ซ้ายและขวา)
+    drawConfirmButton(leftBtn);
+    drawConfirmButton(rightBtn);
 
     // 3. วาดบล็อกตัวเลข
     blocks.forEach((block, index) => {
@@ -327,7 +325,9 @@ function processHandTracking(landmarks) {
 
     if (gameState !== 'PLAYING') return;
 
-    checkButtonHover(confirmBtn, pinchX, pinchY, isPalmOpen);
+    // ตรวจจับทั้งสองปุ่ม
+    checkButtonHover(leftBtn, pinchX, pinchY, isPalmOpen);
+    checkButtonHover(rightBtn, pinchX, pinchY, isPalmOpen);
 
     if (distance < pinchThreshold) {
         if (!isPinching) {
@@ -384,9 +384,12 @@ function realignBlocks() {
         block.y = startY;
     });
 
-    // อัปเดตตำแหน่งปุ่มให้สัมพันธ์กับจอเวลารีไซส์
-    confirmBtn.x = startX + (1 * (BLOCK_WIDTH + spacing)) - 10;
-    confirmBtn.y = startY + BLOCK_HEIGHT + 50; 
+    // ลิงก์ตำแหน่งปุ่มคู่ให้ขยับตามกลุ่มแถวตัวเลขเวลาหน้าจอเปลี่ยนขนาด
+    leftBtn.x = startX - 130;
+    leftBtn.y = startY + BLOCK_HEIGHT + 30;
+
+    rightBtn.x = startX + totalWidth + 20;
+    rightBtn.y = startY + BLOCK_HEIGHT + 30;
 }
 
 function requestCamera() {
