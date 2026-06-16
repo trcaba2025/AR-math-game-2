@@ -1,0 +1,456 @@
+อ๋อ! สไตล์โมเดิร์นแบบนี้ดูสวยงาม สะอาดตา และเว้นพื้นที่ด้านบน-ด้านล่างได้เคลียร์มากครับ สังเกตว่าปุ่มยืนยันซ้าย-ขวาจะถูกย้ายไปอยู่มุมล่าง และแถบภารกิจด้านบนจะกะทัดรัดขึ้นเป็นระเบียบสุดๆ
+
+ผมได้ทำการปรับปรุงโค้ดทั้งหมดใหม่ โดย**เปลี่ยนดีไซน์ UI ใหม่ทั้งหมดให้แกะแบบตามเรฟภาพที่คุณครูส่งมา** เป๊ะๆ เลยครับ ไม่ว่าจะเป็น:
+
+* แถบสถานะด้านบนสีดำโปร่งแสง (`rgba(0,0,0,0.6)`) ขนาดกะทัดรัด
+* ข้อความข้อที่ คะแนน และดาวสีทอง (`⭐ 0 คะแนน`)
+* ป้ายบอกภารกิจทรงมนสีน้ำเงินเข้มอยู่ตรงกลางด้านบน (`ℹ️ เรียงจาก มากไปน้อย`)
+* ปุ่มกางมือยืนยันทรงสี่เหลี่ยมมนสีน้ำเงินเข้ม หลบมุมอยู่ด้านล่างซ้ายและขวา ไม่บังมือ
+* บล็อกตัวเลขขนาดกระทัดรัดขึ้น มีตัวเลขบอกตำแหน่ง 1-8 เล็กๆ อยู่ใต้บล็อก
+
+คุณครูสามารถนำโค้ดทั้งหมดนี้ไปวางทับไฟล์ `index.html` บน GitHub Pages ได้เลยครับ:
+
+```html
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกม AR บล็อกตัวเลขแสนสนุก</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Sarabun', sans-serif;
+            user-select: none;
+        }
+        #video-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        video {
+            transform: scaleX(-1);
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+        #permission-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #121214 0%, #2c3e50 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .btn-start {
+            background-color: #ff4757;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 28px;
+            font-family: 'Sarabun', sans-serif;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(255, 71, 87, 0.4);
+            transition: all 0.2s;
+            margin-top: 30px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="permission-overlay">
+        <h1 style="font-size: 42px; margin-bottom: 10px; color: #f1c40f;">🎮 เกม AR เรียงบล็อกตัวเลข 🎮</h1>
+        <p style="font-size: 22px; max-width: 600px; line-height: 1.6; color: #f5f6fa;">
+            ยินดีต้อนรับสู่อาณาจักรคณิตศาสตร์แสนสนุก! <br>
+            เกมนี้จำเป็นต้องใช้กล้องเพื่อตรวจจับการเคลื่อนไหวนิ้วมือในการลากบล็อกครับ
+        </p>
+        <button class="btn-start" onclick="requestCamera()">กดตรงนี้ เพื่อเปิดกล้องเล่นเกม 🚀</button>
+        <p id="error-text" style="color: #ff6b6b; font-size: 18px; margin-top: 20px; display: none;"></p>
+    </div>
+
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="ar-canvas"></canvas>
+    </div>
+
+<script>
+const videoElement = document.getElementById('webcam');
+const canvasElement = document.getElementById('ar-canvas');
+const canvasCtx = canvasElement.getContext('2d');
+const permissionOverlay = document.getElementById('permission-overlay');
+const errorText = document.getElementById('error-text');
+
+// --- ตั้งค่าเกม ---
+let currentQuestion = 1;
+const totalQuestions = 10;
+let score = 0;
+let gameMode = 'ASC'; 
+let blocks = [];
+let gameState = 'PLAYING'; 
+let feedbackTimer = 0;
+
+// ปรับตำแหน่งปุ่มสี่เหลี่ยมมน หลบอยู่มุมล่างตามเรฟรูปภาพ
+let leftBtn = { x: 30, y: 0, w: 85, h: 85, hovered: false, hoverProgress: 0 };
+let rightBtn = { x: 0, y: 0, w: 85, h: 85, hovered: false, hoverProgress: 0 };
+
+let draggedBlockIndex = null;
+let pinchThreshold = 0.04; 
+let isPinching = false;
+
+function resizeCanvas() {
+    canvasElement.width = window.innerWidth;
+    canvasElement.height = window.innerHeight;
+    
+    // วางปุ่มยืนยันไว้มุมซ้ายล่าง และขวาล่าง ยกระดับขึ้นมาจากขอบเล็กน้อย
+    leftBtn.y = canvasElement.height - 120;
+    rightBtn.x = canvasElement.width - 115;
+    rightBtn.y = canvasElement.height - 120;
+    
+    if (blocks.length > 0) {
+        realignBlocks();
+    }
+}
+window.addEventListener('resize', resizeCanvas);
+
+function generateQuestion() {
+    gameState = 'PLAYING';
+    gameMode = Math.random() > 0.5 ? 'ASC' : 'DESC';
+    let numSet = new Set();
+    while(numSet.size < 8) {
+        numSet.add(Math.floor(Math.random() * 100) + 1);
+    }
+    let numbers = Array.from(numSet);
+
+    // ปรับขนาดบล็อกให้เล็กลงเรียงกันสวยงามตามเรฟ
+    const blockWidth = 70;
+    const blockHeight = 70;
+    const spacing = 15;
+    const totalWidth = (blockWidth * 8) + (spacing * 7);
+    const startX = (canvasElement.width - totalWidth) / 2;
+    const startY = (canvasElement.height / 2) - (blockHeight / 2);
+
+    blocks = numbers.map((num, index) => {
+        return {
+            id: index,
+            value: num,
+            x: startX + (index * (blockWidth + spacing)),
+            y: startY,
+            w: blockWidth,
+            h: blockHeight,
+            color: `hsl(${(index * 45) % 360}, 85%, 60%)`
+        };
+    });
+}
+
+function checkAnswer() {
+    let currentOrder = blocks.map(b => b.value);
+    let sortedOrder = [...currentOrder].sort((a, b) => a - b);
+    if (gameMode === 'DESC') sortedOrder.reverse();
+
+    if (JSON.stringify(currentOrder) === JSON.stringify(sortedOrder)) {
+        score++;
+        gameState = 'CORRECT';
+    } else {
+        gameState = 'WRONG';
+    }
+
+    feedbackTimer = setTimeout(() => {
+        if (currentQuestion < totalQuestions) {
+            currentQuestion++;
+            generateQuestion();
+        } else {
+            gameState = 'GAMEOVER';
+        }
+    }, 2500);
+}
+
+function drawGame(handLandmarks) {
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    // 1. แถบสถานะด้านบนสีดำโปร่งแสงตามภาพเรฟ
+    canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    canvasCtx.fillRect(0, 0, canvasElement.width, 50);
+    
+    canvasCtx.font = 'bold 18px Sarabun';
+    canvasCtx.fillStyle = '#ffffff';
+    canvasCtx.textAlign = 'left';
+    canvasCtx.fillText(`ข้อที่: ${currentQuestion}/${totalQuestions}`, 20, 31);
+    
+    canvasCtx.textAlign = 'right';
+    canvasCtx.fillStyle = '#ffcc00';
+    canvasCtx.fillText(`⭐ ${score} คะแนน`, canvasElement.width - 20, 31);
+
+    // ป้ายภารกิจตรงกลางด้านบน ทรงสี่เหลี่ยมมนสีน้ำเงินเข้ม
+    let labelText = gameMode === 'ASC' ? 'ℹ️ เรียงจาก น้อยไปมาก' : 'ℹ️ เรียงจาก มากไปน้อย';
+    canvasCtx.font = 'bold 16px Sarabun';
+    let textWidth = canvasCtx.measureText(labelText).width;
+    
+    canvasCtx.fillStyle = 'rgba(10, 34, 64, 0.9)';
+    canvasCtx.beginPath();
+    canvasCtx.roundRect((canvasElement.width / 2) - (textWidth/2 + 20), 10, textWidth + 40, 30, 8);
+    canvasCtx.fill();
+    
+    canvasCtx.fillStyle = '#ffffff';
+    canvasCtx.textAlign = 'center';
+    canvasCtx.fillText(labelText, canvasElement.width / 2, 31);
+
+    // 2. วาดปุ่มยืนยันสี่เหลี่ยมมนมุมล่างซ้าย-ขวา
+    drawConfirmButton(leftBtn, 'มือซ้าย');
+    drawConfirmButton(rightBtn, 'มือขวา');
+
+    // 3. วาดบล็อกตัวเลข และตัวเลขลำดับ 1-8 ใต้บล็อก
+    blocks.forEach((block, index) => {
+        canvasCtx.fillStyle = block.color;
+        if (draggedBlockIndex === index) {
+            canvasCtx.fillStyle = '#f1c40f'; // สีทองตอนโดนลาก
+        }
+        
+        canvasCtx.beginPath();
+        canvasCtx.roundRect(block.x, block.y, block.w, block.h, 12);
+        canvasCtx.fill();
+        canvasCtx.lineWidth = 2;
+        canvasCtx.strokeStyle = '#ffffff';
+        canvasCtx.stroke();
+        
+        // ตัวเลขในบล็อก
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.font = 'bold 28px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.textBaseline = 'middle';
+        canvasCtx.fillText(block.value, block.x + block.w/2, block.y + block.h/2);
+        
+        // วาดตัวเลขลำดับ 1-8 สีเทาจางๆ ด้านใต้บล็อกตามภาพเรฟ
+        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        canvasCtx.font = '14px Sarabun';
+        canvasCtx.textBaseline = 'top';
+        canvasCtx.fillText(index + 1, block.x + block.w/2, block.y + block.h + 8);
+    });
+
+    if (gameState === 'CORRECT') drawOverlay('🎉 ถูกต้องเก่งมาก! 🎉', '#2ec4b6');
+    else if (gameState === 'WRONG') drawOverlay('❌ ลองใหม่อีกทีนะจ๊ะ ❌', '#e71d36');
+    else if (gameState === 'GAMEOVER') drawOverlay(`🏁 จบเกม! ได้คะแนน ${score}/${totalQuestions} 🏁`, '#9b59b6');
+
+    if (handLandmarks) processHandTracking(handLandmarks);
+}
+
+function drawConfirmButton(btn, text) {
+    // วาดกล่องปุ่มทรงสี่เหลี่ยมมนสีน้ำเงินเข้มตามเรฟ
+    canvasCtx.fillStyle = btn.hovered ? 'rgba(46, 204, 113, 0.95)' : 'rgba(20, 30, 55, 0.85)';
+    canvasCtx.beginPath();
+    canvasCtx.roundRect(btn.x, btn.y, btn.w, btn.h, 15);
+    canvasCtx.fill();
+    canvasCtx.lineWidth = 2;
+    canvasCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+    canvasCtx.stroke();
+
+    // ไอคอนรูปมือตรงกลาง
+    canvasCtx.fillStyle = '#ffcc00';
+    canvasCtx.font = '24px Sarabun';
+    canvasCtx.textAlign = 'center';
+    canvasCtx.textBaseline = 'middle';
+    canvasCtx.fillText('🖐️', btn.x + btn.w/2, btn.y + btn.h/2 - 12);
+
+    // ข้อความในปุ่ม
+    canvasCtx.fillStyle = '#ffffff';
+    canvasCtx.font = 'bold 12px Sarabun';
+    canvasCtx.fillText('กางมือยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 15);
+    canvasCtx.font = '10px Sarabun';
+    canvasCtx.fillStyle = 'rgba(255,255,255,0.6)';
+    canvasCtx.fillText(text, btn.x + btn.w/2, btn.y + btn.h/2 + 28);
+
+    // เกจโหลดวงกลมเมื่อกางมือค้างไว้
+    if (btn.hoverProgress > 0) {
+        canvasCtx.beginPath();
+        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 - 10, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
+        canvasCtx.lineWidth = 4;
+        canvasCtx.strokeStyle = '#2ecc71';
+        canvasCtx.stroke();
+    }
+}
+
+function drawOverlay(text, color) {
+    canvasCtx.fillStyle = 'rgba(0,0,0,0.7)';
+    canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.fillStyle = color;
+    canvasCtx.font = 'bold 40px Sarabun';
+    canvasCtx.textAlign = 'center';
+    canvasCtx.textBaseline = 'middle';
+    canvasCtx.fillText(text, canvasElement.width / 2, canvasElement.height / 2);
+}
+
+function processHandTracking(landmarks) {
+    const thumb = { x: (1 - landmarks[4].x) * canvasElement.width, y: landmarks[4].y * canvasElement.height };
+    const indexFinger = { x: (1 - landmarks[8].x) * canvasElement.width, y: landmarks[8].y * canvasElement.height };
+    const pinchX = (thumb.x + indexFinger.x) / 2;
+    const pinchY = (thumb.y + indexFinger.y) / 2;
+    const distance = Math.sqrt(Math.pow(landmarks[4].x - landmarks[8].x, 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
+    
+    // ตรวจจับการกางฝ่ามือ (เทียบพิกัดปลายนิ้วกับข้อต่อนิ้ว)
+    const isPalmOpen = landmarks[12].y < landmarks[10].y && landmarks[16].y < landmarks[14].y; 
+
+    // วาดจุดกึ่งกลางและเส้นวงกลมเป้าเล็งล็อกนิ้วแบบมินิมอลตามเรฟภาพ
+    canvasCtx.beginPath();
+    canvasCtx.arc(pinchX, pinchY, 14, 0, Math.PI * 2);
+    canvasCtx.strokeStyle = distance < pinchThreshold ? '#ff3366' : '#ffffff';
+    canvasCtx.lineWidth = 2;
+    canvasCtx.stroke();
+
+    // วาดจุดจับพิกัดโครงมือสีขาวจางๆ ให้ดูเท่แบบ AR
+    canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    landmarks.forEach(lm => {
+        canvasCtx.beginPath();
+        canvasCtx.arc((1 - lm.x) * canvasElement.width, lm.y * canvasElement.height, 4, 0, Math.PI * 2);
+        canvasCtx.fill();
+    });
+
+    if (gameState !== 'PLAYING') return;
+
+    checkButtonHover(leftBtn, pinchX, pinchY, isPalmOpen);
+    checkButtonHover(rightBtn, pinchX, pinchY, isPalmOpen);
+
+    if (distance < pinchThreshold) {
+        if (!isPinching) {
+            blocks.forEach((block, idx) => {
+                if (pinchX > block.x && pinchX < block.x + block.w && pinchY > block.y && pinchY < block.y + block.h) {
+                    draggedBlockIndex = idx;
+                    isPinching = true;
+                }
+            });
+        } else if (draggedBlockIndex !== null) {
+            blocks[draggedBlockIndex].x = pinchX - blocks[draggedBlockIndex].w / 2;
+            blocks[draggedBlockIndex].y = pinchY - blocks[draggedBlockIndex].h / 2;
+        }
+    } else {
+        if (isPinching && draggedBlockIndex !== null) {
+            let targetIndex = blocks.findIndex((b, idx) => {
+                if (idx === draggedBlockIndex) return false;
+                return pinchX > b.x && pinchX < b.x + b.w;
+            });
+            if (targetIndex !== -1) {
+                let temp = blocks[draggedBlockIndex];
+                blocks[draggedBlockIndex] = blocks[targetIndex];
+                blocks[targetIndex] = temp;
+            }
+            realignBlocks();
+        }
+        isPinching = false;
+        draggedBlockIndex = null;
+    }
+}
+
+function checkButtonHover(btn, px, py, isPalmOpen) {
+    if (px > btn.x && px < btn.x + btn.w && py > btn.y && py < btn.y + btn.h && isPalmOpen) {
+        btn.hovered = true;
+        btn.hoverProgress++;
+        if (btn.hoverProgress >= 40) {
+            btn.hoverProgress = 0;
+            checkAnswer();
+        }
+    } else {
+        btn.hovered = false;
+        btn.hoverProgress = Math.max(0, btn.hoverProgress - 2);
+    }
+}
+
+function realignBlocks() {
+    const blockWidth = 70;
+    const blockHeight = 70;
+    const spacing = 15;
+    const totalWidth = (blockWidth * 8) + (spacing * 7);
+    const startX = (canvasElement.width - totalWidth) / 2;
+    const startY = (canvasElement.height / 2) - (blockHeight / 2);
+    
+    blocks.forEach((block, index) => {
+        block.x = startX + (index * (blockWidth + spacing));
+        block.y = startY;
+    });
+}
+
+function requestCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+    .then((stream) => {
+        permissionOverlay.style.display = 'none';
+        videoElement.srcObject = stream;
+        startMediaPipe();
+    })
+    .catch((err) => {
+        errorText.style.display = 'block';
+        errorText.innerHTML = "❌ ไม่สามารถเข้าถึงกล้องได้: กรุณาเปิดผ่าน Chrome/Safari หลักของเครื่องครับ";
+    });
+}
+
+function startMediaPipe() {
+    const hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.75,
+        minTrackingConfidence: 0.75
+    });
+
+    hands.onResults((results) => {
+        let handLandmarks = null;
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            handLandmarks = results.multiHandLandmarks[0];
+        }
+        drawGame(handLandmarks);
+    });
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => {
+            await hands.send({ image: videoElement });
+        },
+        width: 1280,
+        height: 720
+    });
+    
+    camera.start();
+    resizeCanvas();
+    generateQuestion();
+}
+</script>
+</body>
+</html>
+
+```
