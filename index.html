@@ -1,10 +1,3 @@
-ได้เลยครับคุณครู! ย้ายกลับมาใช้ **ปุ่มทรงกลมสีส้มแสนสวย** สไตล์ดั้งเดิมแบบในรูปแรกเรียบร้อยแล้วครับ
-
-โดยในโค้ดนี้ผมได้ดึงเอา **ปุ่มวงกลมสีส้มขอบขาว** ตัวเดิมกลับมา แต่จัดระเบียบใหม่ให้ลอยสูงขึ้นมาจากขอบล่างพอสมควร (พ้นแถบ Taskbar แน่นอน) และยังคงรักษาขนาดบล็อกตัวเลขที่ขยายใหญ่ 90px เต็มตาเอาไว้ให้ตามเดิมครับ
-
-คุณครูคัดลอกโค้ดนี้ไปแก้ไขทับใน GitHub ได้เลยครับ:
-
-```html
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -121,15 +114,22 @@ let blocks = [];
 let gameState = 'PLAYING'; 
 let feedbackTimer = 0;
 
-// เปลี่ยนขนาดปุ่มยืนยันกลับเป็นแบบวงกลมขนาดใหญ่เด่นชัด (w: 120, h: 120) ตามแบบแรก
-let leftBtn = { x: 50, y: 0, w: 120, h: 120, hovered: false, hoverProgress: 0 };
-let rightBtn = { x: 0, y: 0, w: 120, h: 120, hovered: false, hoverProgress: 0 };
+// ==========================================
+// [จุดสำคัญ] ตั้งค่าตัวแปรปุ่มยืนยันวงกลมส้ม
+// ==========================================
+let confirmBtn = { 
+    x: 60,          // ระยะห่างจากขอบซ้าย 60 พิกเซล
+    y: 0,           // พิกัดแนวตั้ง (จะถูกคำนวณใหม่ในฟังก์ชัน resizeCanvas)
+    w: 120,         // ความกว้างของปุ่ม 120 พิกเซล
+    h: 120,         // ความสูงของปุ่ม 120 พิกเซล
+    hovered: false, 
+    hoverProgress: 0 
+};
 
 let draggedBlockIndex = null;
 let pinchThreshold = 0.04; 
 let isPinching = false;
 
-// ขนาดบล็อกตัวเลขขนาดใหญ่ (90px) ตามที่คุณครูชอบ
 const BLOCK_WIDTH = 90;
 const BLOCK_HEIGHT = 90;
 
@@ -137,10 +137,11 @@ function resizeCanvas() {
     canvasElement.width = window.innerWidth;
     canvasElement.height = window.innerHeight;
     
-    // ตั้งพิกัดแกน Y ของปุ่มวงกลมสีส้มให้สูงพ้นขอบล่าง (ยกขึ้นมาหลบแถบ Taskbar)
-    leftBtn.y = canvasElement.height - 200;
-    rightBtn.x = canvasElement.width - 170;
-    rightBtn.y = canvasElement.height - 200;
+    // ==========================================
+    // [จุดสำคัญ] คำนวณตำแหน่งปุ่มให้อยู่ในกรอบสีแดงของคุณครู
+    // ==========================================
+    // ใช้ความสูงหน้าจอทั้งหมด ลบออก 320 พิกเซล เพื่อดึงปุ่มลอยขึ้นมาเหนือแถบโทรศัพท์มือถือ
+    confirmBtn.y = canvasElement.height - 320; 
     
     if (blocks.length > 0) {
         realignBlocks();
@@ -200,7 +201,6 @@ function checkAnswer() {
 function drawGame(handLandmarks) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    // 1. แถบสถานะด้านบนสีดำโปร่งแสงสไตล์โมเดิร์น
     canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     canvasCtx.fillRect(0, 0, canvasElement.width, 50);
     
@@ -213,7 +213,6 @@ function drawGame(handLandmarks) {
     canvasCtx.fillStyle = '#ffcc00';
     canvasCtx.fillText(`⭐ ${score} คะแนน`, canvasElement.width - 20, 31);
 
-    // ป้ายภารกิจตรงกลางด้านบน ทรงสี่เหลี่ยมมนสีน้ำเงินเข้ม
     let labelText = gameMode === 'ASC' ? 'ℹ️ เรียงจาก น้อยไปมาก' : 'ℹ️ เรียงจาก มากไปน้อย';
     canvasCtx.font = 'bold 16px Sarabun';
     let textWidth = canvasCtx.measureText(labelText).width;
@@ -227,11 +226,11 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillText(labelText, canvasElement.width / 2, 31);
 
-    // 2. วาดปุ่มยืนยันวงกลมสีส้มขอบขาว (ดึงกลับมาจากแบบแรก)
-    drawConfirmButton(leftBtn, 'มือซ้าย');
-    drawConfirmButton(rightBtn, 'มือขวา');
+    // ==========================================
+    // [จุดสำคัญ] วาดปุ่มวงกลมส้มในจุดใหม่พิกัดที่เลือกไว้
+    // ==========================================
+    drawConfirmButton(confirmBtn);
 
-    // 3. วาดบล็อกตัวเลขขนาดใหญ่เด่นชัด
     blocks.forEach((block, index) => {
         canvasCtx.fillStyle = block.color;
         if (draggedBlockIndex === index) {
@@ -245,14 +244,12 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
         
-        // ตัวเลขในบล็อก
         canvasCtx.fillStyle = '#ffffff';
         canvasCtx.font = 'bold 36px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(block.value, block.x + block.w/2, block.y + block.h/2);
         
-        // ตัวเลขลำดับ 1-8 ด้านใต้บล็อก
         canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
         canvasCtx.font = 'bold 16px Sarabun';
         canvasCtx.textBaseline = 'top';
@@ -266,12 +263,16 @@ function drawGame(handLandmarks) {
     if (handLandmarks) processHandTracking(handLandmarks);
 }
 
-function drawConfirmButton(btn, text) {
-    // วาดวงกลมสีส้มตามสไตล์ปุ่มแบบแรกสุด (และเปลี่ยนเป็นสีเขียวเมื่อเอามือมาทับ)
+// ==========================================
+// ฟังก์ชันวาดปุ่มวงกลมสีส้ม
+// ==========================================
+function drawConfirmButton(btn) {
     canvasCtx.shadowBlur = 10;
     canvasCtx.shadowColor = 'rgba(0,0,0,0.3)';
     canvasCtx.beginPath();
+    // วาดวงกลมตรงกึ่งกลางพิกัด x, y ของวัตถุ
     canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2, 0, Math.PI * 2);
+    // ถ้าเอามือมาค้างไว้จะเปลี่ยนเป็นสีเขียว ถ้าปล่อยจะเป็นสีส้ม
     canvasCtx.fillStyle = btn.hovered ? '#2ecc71' : '#e67e22';
     canvasCtx.fill();
     canvasCtx.lineWidth = 5;
@@ -286,7 +287,7 @@ function drawConfirmButton(btn, text) {
     canvasCtx.fillText('กางมือ', btn.x + btn.w/2, btn.y + btn.h/2 - 16);
     canvasCtx.fillText('ยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 16);
 
-    // เกจโหลดรอบวงกลมเมื่อกางมือค้างไว้
+    // หลอดโหลดวงกลมสีเขียวรอบนอกเวลากางมือค้างไว้
     if (btn.hoverProgress > 0) {
         canvasCtx.beginPath();
         canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 + 8, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
@@ -330,9 +331,10 @@ function processHandTracking(landmarks) {
 
     if (gameState !== 'PLAYING') return;
 
-    // ตรวจจับพิกัดชนกับขอบเขตสี่เหลี่ยมรอบวงกลม
-    checkButtonHover(leftBtn, pinchX, pinchY, isPalmOpen);
-    checkButtonHover(rightBtn, pinchX, pinchY, isPalmOpen);
+    // ==========================================
+    // [จุดสำคัญ] เช็กว่าสัญลักษณ์มือชนกับปุ่มยืนยันซ้ายอันใหม่ตัวนี้ตัวเดียวหรือไม่
+    // ==========================================
+    checkButtonHover(confirmBtn, pinchX, pinchY, isPalmOpen);
 
     if (distance < pinchThreshold) {
         if (!isPinching) {
@@ -438,5 +440,3 @@ function startMediaPipe() {
 </script>
 </body>
 </html>
-
-```
