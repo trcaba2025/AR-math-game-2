@@ -1,3 +1,10 @@
+ได้เลยครับคุณครู! ย้ายกลับมาใช้ **ปุ่มทรงกลมสีส้มแสนสวย** สไตล์ดั้งเดิมแบบในรูปแรกเรียบร้อยแล้วครับ
+
+โดยในโค้ดนี้ผมได้ดึงเอา **ปุ่มวงกลมสีส้มขอบขาว** ตัวเดิมกลับมา แต่จัดระเบียบใหม่ให้ลอยสูงขึ้นมาจากขอบล่างพอสมควร (พ้นแถบ Taskbar แน่นอน) และยังคงรักษาขนาดบล็อกตัวเลขที่ขยายใหญ่ 90px เต็มตาเอาไว้ให้ตามเดิมครับ
+
+คุณครูคัดลอกโค้ดนี้ไปแก้ไขทับใน GitHub ได้เลยครับ:
+
+```html
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -114,15 +121,15 @@ let blocks = [];
 let gameState = 'PLAYING'; 
 let feedbackTimer = 0;
 
-// ปรับขนาดปุ่มยืนยันให้ใหญ่ขึ้น (w: 100, h: 100)
-let leftBtn = { x: 40, y: 0, w: 100, h: 100, hovered: false, hoverProgress: 0 };
-let rightBtn = { x: 0, y: 0, w: 100, h: 100, hovered: false, hoverProgress: 0 };
+// เปลี่ยนขนาดปุ่มยืนยันกลับเป็นแบบวงกลมขนาดใหญ่เด่นชัด (w: 120, h: 120) ตามแบบแรก
+let leftBtn = { x: 50, y: 0, w: 120, h: 120, hovered: false, hoverProgress: 0 };
+let rightBtn = { x: 0, y: 0, w: 120, h: 120, hovered: false, hoverProgress: 0 };
 
 let draggedBlockIndex = null;
 let pinchThreshold = 0.04; 
 let isPinching = false;
 
-// ขนาดบล็อกตัวเลขเวอร์ชันขยายใหญ่ (ตามใจคุณครู)
+// ขนาดบล็อกตัวเลขขนาดใหญ่ (90px) ตามที่คุณครูชอบ
 const BLOCK_WIDTH = 90;
 const BLOCK_HEIGHT = 90;
 
@@ -130,10 +137,10 @@ function resizeCanvas() {
     canvasElement.width = window.innerWidth;
     canvasElement.height = window.innerHeight;
     
-    // ดึงปุ่มยืนยันซ้าย-ขวาให้ลอยสูงขึ้นจากขอบล่าง 180px ยกร่างหลบแถบ Taskbar
-    leftBtn.y = canvasElement.height - 180;
-    rightBtn.x = canvasElement.width - 140;
-    rightBtn.y = canvasElement.height - 180;
+    // ตั้งพิกัดแกน Y ของปุ่มวงกลมสีส้มให้สูงพ้นขอบล่าง (ยกขึ้นมาหลบแถบ Taskbar)
+    leftBtn.y = canvasElement.height - 200;
+    rightBtn.x = canvasElement.width - 170;
+    rightBtn.y = canvasElement.height - 200;
     
     if (blocks.length > 0) {
         realignBlocks();
@@ -193,7 +200,7 @@ function checkAnswer() {
 function drawGame(handLandmarks) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    // 1. แถบสถานะด้านบนสีดำโปร่งแสง
+    // 1. แถบสถานะด้านบนสีดำโปร่งแสงสไตล์โมเดิร์น
     canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     canvasCtx.fillRect(0, 0, canvasElement.width, 50);
     
@@ -220,7 +227,7 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillText(labelText, canvasElement.width / 2, 31);
 
-    // 2. วาดปุ่มยืนยันที่ลอยสูงขึ้นมาแล้ว
+    // 2. วาดปุ่มยืนยันวงกลมสีส้มขอบขาว (ดึงกลับมาจากแบบแรก)
     drawConfirmButton(leftBtn, 'มือซ้าย');
     drawConfirmButton(rightBtn, 'มือขวา');
 
@@ -238,7 +245,7 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
         
-        // ตัวเลขในบล็อก (ขยายขนาดฟอนต์ตามกล่อง)
+        // ตัวเลขในบล็อก
         canvasCtx.fillStyle = '#ffffff';
         canvasCtx.font = 'bold 36px Sarabun';
         canvasCtx.textAlign = 'center';
@@ -260,34 +267,31 @@ function drawGame(handLandmarks) {
 }
 
 function drawConfirmButton(btn, text) {
-    canvasCtx.fillStyle = btn.hovered ? 'rgba(46, 204, 113, 0.95)' : 'rgba(20, 30, 55, 0.85)';
+    // วาดวงกลมสีส้มตามสไตล์ปุ่มแบบแรกสุด (และเปลี่ยนเป็นสีเขียวเมื่อเอามือมาทับ)
+    canvasCtx.shadowBlur = 10;
+    canvasCtx.shadowColor = 'rgba(0,0,0,0.3)';
     canvasCtx.beginPath();
-    canvasCtx.roundRect(btn.x, btn.y, btn.w, btn.h, 18);
+    canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2, 0, Math.PI * 2);
+    canvasCtx.fillStyle = btn.hovered ? '#2ecc71' : '#e67e22';
     canvasCtx.fill();
-    canvasCtx.lineWidth = 2.5;
-    canvasCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+    canvasCtx.lineWidth = 5;
+    canvasCtx.strokeStyle = '#ffffff';
     canvasCtx.stroke();
 
-    // ไอคอนรูปมือ
-    canvasCtx.fillStyle = '#ffcc00';
-    canvasCtx.font = '28px Sarabun';
+    canvasCtx.shadowBlur = 0;
+    canvasCtx.fillStyle = '#ffffff';
+    canvasCtx.font = 'bold 20px Sarabun';
     canvasCtx.textAlign = 'center';
     canvasCtx.textBaseline = 'middle';
-    canvasCtx.fillText('🖐️', btn.x + btn.w/2, btn.y + btn.h/2 - 14);
+    canvasCtx.fillText('กางมือ', btn.x + btn.w/2, btn.y + btn.h/2 - 16);
+    canvasCtx.fillText('ยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 16);
 
-    // ข้อความในปุ่มปรับสเกลตามขนาดใหม่
-    canvasCtx.fillStyle = '#ffffff';
-    canvasCtx.font = 'bold 13px Sarabun';
-    canvasCtx.fillText('กางมือยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 18);
-    canvasCtx.font = '11px Sarabun';
-    canvasCtx.fillStyle = 'rgba(255,255,255,0.6)';
-    canvasCtx.fillText(text, btn.x + btn.w/2, btn.y + btn.h/2 + 33);
-
+    // เกจโหลดรอบวงกลมเมื่อกางมือค้างไว้
     if (btn.hoverProgress > 0) {
         canvasCtx.beginPath();
-        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 - 12, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
-        canvasCtx.lineWidth = 5;
-        canvasCtx.strokeStyle = '#2ecc71';
+        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 + 8, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
+        canvasCtx.lineWidth = 6;
+        canvasCtx.strokeStyle = '#2ef17c';
         canvasCtx.stroke();
     }
 }
@@ -326,6 +330,7 @@ function processHandTracking(landmarks) {
 
     if (gameState !== 'PLAYING') return;
 
+    // ตรวจจับพิกัดชนกับขอบเขตสี่เหลี่ยมรอบวงกลม
     checkButtonHover(leftBtn, pinchX, pinchY, isPalmOpen);
     checkButtonHover(rightBtn, pinchX, pinchY, isPalmOpen);
 
@@ -434,3 +439,4 @@ function startMediaPipe() {
 </body>
 </html>
 
+```
