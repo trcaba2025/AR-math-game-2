@@ -115,10 +115,16 @@ let gameState = 'PLAYING';
 let feedbackTimer = 0;
 
 // ==========================================
-// กลับมาใช้โครงสร้างปุ่มคู่ ซ้าย-ขวา ตามเดิมครับ
+// [ปรับปรุง] ปุ่มเดียวเดี่ยวๆ ขนาดเหมาะสมสำหรับวางกลางจอ
 // ==========================================
-let leftBtn = { x: 0, y: 0, w: 110, h: 110, hovered: false, hoverProgress: 0 };
-let rightBtn = { x: 0, y: 0, w: 110, h: 110, hovered: false, hoverProgress: 0 };
+let confirmBtn = { 
+    x: 0,           // พิกัด X (จะคำนวณให้อยู่กึ่งกลางจอพอดี)
+    y: 0,           // พิกัด Y (จะคำนวณให้อยู่ใต้แถวตัวเลขในระยะที่เหมาะสม)
+    w: 120,         // ความกว้างปุ่ม 120 พิกเซล
+    h: 120,         // ความสูงปุ่ม 120 พิกเซล
+    hovered: false, 
+    hoverProgress: 0 
+};
 
 let draggedBlockIndex = null;
 let pinchThreshold = 0.04; 
@@ -164,15 +170,13 @@ function generateQuestion() {
     });
 
     // ===================================================
-    // [จุดแก้ไขเรื่องตำแหน่ง] ขยับปุ่มคู่เข้ามาด้านในและยกสูงขึ้น
+    // [จุดปรับตำแหน่งสำคัญ] จัดให้อยู่กึ่งกลางหน้าจอ ใต้แถวตัวเลขพอดี
     // ===================================================
-    // ปุ่มซ้าย: ขยับเข้ามาตั้งหลักห่างจากบล็อกตัวแรกนิดหน่อย และให้สูงขึ้นมาใต้แถวตัวเลขพอดี
-    leftBtn.x = startX - 130;
-    leftBtn.y = startY + BLOCK_HEIGHT + 30;
-
-    // ปุ่มขวา: ขยับเข้ามาด้านขวาของบล็อกตัวสุดท้าย
-    rightBtn.x = startX + totalWidth + 20;
-    rightBtn.y = startY + BLOCK_HEIGHT + 30;
+    // สูตรคำนวณหากึ่งกลางจอ: (ความกว้างหน้าจอทั้งหมด / 2) - (ความกว้างปุ่ม / 2)
+    confirmBtn.x = (canvasElement.width / 2) - (confirmBtn.w / 2);
+    
+    // ตั้งพิกัดแนวตั้งให้อยู่ใต้บล็อกตัวเลขลงมา 80 พิกเซล (ไม่ชิดเกินไป ไม่ต่ำเกินไป)
+    confirmBtn.y = startY + BLOCK_HEIGHT + 80; 
 }
 
 function checkAnswer() {
@@ -226,9 +230,8 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillText(labelText, canvasElement.width / 2, 31);
 
-    // 2. วาดปุ่มยืนยันทั้งสองฝั่ง (ซ้ายและขวา)
-    drawConfirmButton(leftBtn);
-    drawConfirmButton(rightBtn);
+    // 2. วาดปุ่มยืนยันปุ่มเดียวที่จุดศูนย์กลางจอ
+    drawConfirmButton(confirmBtn);
 
     // 3. วาดบล็อกตัวเลข
     blocks.forEach((block, index) => {
@@ -264,8 +267,8 @@ function drawGame(handLandmarks) {
 }
 
 function drawConfirmButton(btn) {
-    canvasCtx.shadowBlur = 10;
-    canvasCtx.shadowColor = 'rgba(0,0,0,0.3)';
+    canvasCtx.shadowBlur = 12;
+    canvasCtx.shadowColor = 'rgba(0,0,0,0.4)';
     canvasCtx.beginPath();
     canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2, 0, Math.PI * 2);
     canvasCtx.fillStyle = btn.hovered ? '#2ecc71' : '#e67e22';
@@ -276,16 +279,16 @@ function drawConfirmButton(btn) {
 
     canvasCtx.shadowBlur = 0;
     canvasCtx.fillStyle = '#ffffff';
-    canvasCtx.font = 'bold 18px Sarabun';
+    canvasCtx.font = 'bold 20px Sarabun';
     canvasCtx.textAlign = 'center';
     canvasCtx.textBaseline = 'middle';
-    canvasCtx.fillText('กางมือ', btn.x + btn.w/2, btn.y + btn.h/2 - 14);
-    canvasCtx.fillText('ยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 14);
+    canvasCtx.fillText('กางมือ', btn.x + btn.w/2, btn.y + btn.h/2 - 15);
+    canvasCtx.fillText('ยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 15);
 
     if (btn.hoverProgress > 0) {
         canvasCtx.beginPath();
-        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 + 6, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
-        canvasCtx.lineWidth = 5;
+        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 + 7, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
+        canvasCtx.lineWidth = 6;
         canvasCtx.strokeStyle = '#2ef17c';
         canvasCtx.stroke();
     }
@@ -325,9 +328,7 @@ function processHandTracking(landmarks) {
 
     if (gameState !== 'PLAYING') return;
 
-    // ตรวจจับทั้งสองปุ่ม
-    checkButtonHover(leftBtn, pinchX, pinchY, isPalmOpen);
-    checkButtonHover(rightBtn, pinchX, pinchY, isPalmOpen);
+    checkButtonHover(confirmBtn, pinchX, pinchY, isPalmOpen);
 
     if (distance < pinchThreshold) {
         if (!isPinching) {
@@ -384,12 +385,9 @@ function realignBlocks() {
         block.y = startY;
     });
 
-    // ลิงก์ตำแหน่งปุ่มคู่ให้ขยับตามกลุ่มแถวตัวเลขเวลาหน้าจอเปลี่ยนขนาด
-    leftBtn.x = startX - 130;
-    leftBtn.y = startY + BLOCK_HEIGHT + 30;
-
-    rightBtn.x = startX + totalWidth + 20;
-    rightBtn.y = startY + BLOCK_HEIGHT + 30;
+    // อัปเดตพิกัดปุ่มเมื่อหน้าจอเปลี่ยนขนาดให้อยู่กึ่งกลางจอเสมอ
+    confirmBtn.x = (canvasElement.width / 2) - (confirmBtn.w / 2);
+    confirmBtn.y = startY + BLOCK_HEIGHT + 80; 
 }
 
 function requestCamera() {
