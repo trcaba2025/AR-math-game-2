@@ -1,16 +1,3 @@
-อ๋อ! สไตล์โมเดิร์นแบบนี้ดูสวยงาม สะอาดตา และเว้นพื้นที่ด้านบน-ด้านล่างได้เคลียร์มากครับ สังเกตว่าปุ่มยืนยันซ้าย-ขวาจะถูกย้ายไปอยู่มุมล่าง และแถบภารกิจด้านบนจะกะทัดรัดขึ้นเป็นระเบียบสุดๆ
-
-ผมได้ทำการปรับปรุงโค้ดทั้งหมดใหม่ โดย**เปลี่ยนดีไซน์ UI ใหม่ทั้งหมดให้แกะแบบตามเรฟภาพที่คุณครูส่งมา** เป๊ะๆ เลยครับ ไม่ว่าจะเป็น:
-
-* แถบสถานะด้านบนสีดำโปร่งแสง (`rgba(0,0,0,0.6)`) ขนาดกะทัดรัด
-* ข้อความข้อที่ คะแนน และดาวสีทอง (`⭐ 0 คะแนน`)
-* ป้ายบอกภารกิจทรงมนสีน้ำเงินเข้มอยู่ตรงกลางด้านบน (`ℹ️ เรียงจาก มากไปน้อย`)
-* ปุ่มกางมือยืนยันทรงสี่เหลี่ยมมนสีน้ำเงินเข้ม หลบมุมอยู่ด้านล่างซ้ายและขวา ไม่บังมือ
-* บล็อกตัวเลขขนาดกระทัดรัดขึ้น มีตัวเลขบอกตำแหน่ง 1-8 เล็กๆ อยู่ใต้บล็อก
-
-คุณครูสามารถนำโค้ดทั้งหมดนี้ไปวางทับไฟล์ `index.html` บน GitHub Pages ได้เลยครับ:
-
-```html
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -19,7 +6,7 @@
     <title>เกม AR บล็อกตัวเลขแสนสนุก</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -127,22 +114,26 @@ let blocks = [];
 let gameState = 'PLAYING'; 
 let feedbackTimer = 0;
 
-// ปรับตำแหน่งปุ่มสี่เหลี่ยมมน หลบอยู่มุมล่างตามเรฟรูปภาพ
-let leftBtn = { x: 30, y: 0, w: 85, h: 85, hovered: false, hoverProgress: 0 };
-let rightBtn = { x: 0, y: 0, w: 85, h: 85, hovered: false, hoverProgress: 0 };
+// ปรับขนาดปุ่มยืนยันให้ใหญ่ขึ้น (w: 100, h: 100)
+let leftBtn = { x: 40, y: 0, w: 100, h: 100, hovered: false, hoverProgress: 0 };
+let rightBtn = { x: 0, y: 0, w: 100, h: 100, hovered: false, hoverProgress: 0 };
 
 let draggedBlockIndex = null;
 let pinchThreshold = 0.04; 
 let isPinching = false;
 
+// ขนาดบล็อกตัวเลขเวอร์ชันขยายใหญ่ (ตามใจคุณครู)
+const BLOCK_WIDTH = 90;
+const BLOCK_HEIGHT = 90;
+
 function resizeCanvas() {
     canvasElement.width = window.innerWidth;
     canvasElement.height = window.innerHeight;
     
-    // วางปุ่มยืนยันไว้มุมซ้ายล่าง และขวาล่าง ยกระดับขึ้นมาจากขอบเล็กน้อย
-    leftBtn.y = canvasElement.height - 120;
-    rightBtn.x = canvasElement.width - 115;
-    rightBtn.y = canvasElement.height - 120;
+    // ดึงปุ่มยืนยันซ้าย-ขวาให้ลอยสูงขึ้นจากขอบล่าง 180px ยกร่างหลบแถบ Taskbar
+    leftBtn.y = canvasElement.height - 180;
+    rightBtn.x = canvasElement.width - 140;
+    rightBtn.y = canvasElement.height - 180;
     
     if (blocks.length > 0) {
         realignBlocks();
@@ -159,22 +150,19 @@ function generateQuestion() {
     }
     let numbers = Array.from(numSet);
 
-    // ปรับขนาดบล็อกให้เล็กลงเรียงกันสวยงามตามเรฟ
-    const blockWidth = 70;
-    const blockHeight = 70;
-    const spacing = 15;
-    const totalWidth = (blockWidth * 8) + (spacing * 7);
+    const spacing = 18;
+    const totalWidth = (BLOCK_WIDTH * 8) + (spacing * 7);
     const startX = (canvasElement.width - totalWidth) / 2;
-    const startY = (canvasElement.height / 2) - (blockHeight / 2);
+    const startY = (canvasElement.height / 2) - (BLOCK_HEIGHT / 2);
 
     blocks = numbers.map((num, index) => {
         return {
             id: index,
             value: num,
-            x: startX + (index * (blockWidth + spacing)),
+            x: startX + (index * (BLOCK_WIDTH + spacing)),
             y: startY,
-            w: blockWidth,
-            h: blockHeight,
+            w: BLOCK_WIDTH,
+            h: BLOCK_HEIGHT,
             color: `hsl(${(index * 45) % 360}, 85%, 60%)`
         };
     });
@@ -205,7 +193,7 @@ function checkAnswer() {
 function drawGame(handLandmarks) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    // 1. แถบสถานะด้านบนสีดำโปร่งแสงตามภาพเรฟ
+    // 1. แถบสถานะด้านบนสีดำโปร่งแสง
     canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     canvasCtx.fillRect(0, 0, canvasElement.width, 50);
     
@@ -232,36 +220,36 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillText(labelText, canvasElement.width / 2, 31);
 
-    // 2. วาดปุ่มยืนยันสี่เหลี่ยมมนมุมล่างซ้าย-ขวา
+    // 2. วาดปุ่มยืนยันที่ลอยสูงขึ้นมาแล้ว
     drawConfirmButton(leftBtn, 'มือซ้าย');
     drawConfirmButton(rightBtn, 'มือขวา');
 
-    // 3. วาดบล็อกตัวเลข และตัวเลขลำดับ 1-8 ใต้บล็อก
+    // 3. วาดบล็อกตัวเลขขนาดใหญ่เด่นชัด
     blocks.forEach((block, index) => {
         canvasCtx.fillStyle = block.color;
         if (draggedBlockIndex === index) {
-            canvasCtx.fillStyle = '#f1c40f'; // สีทองตอนโดนลาก
+            canvasCtx.fillStyle = '#f1c40f'; 
         }
         
         canvasCtx.beginPath();
-        canvasCtx.roundRect(block.x, block.y, block.w, block.h, 12);
+        canvasCtx.roundRect(block.x, block.y, block.w, block.h, 15);
         canvasCtx.fill();
-        canvasCtx.lineWidth = 2;
+        canvasCtx.lineWidth = 3;
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
         
-        // ตัวเลขในบล็อก
+        // ตัวเลขในบล็อก (ขยายขนาดฟอนต์ตามกล่อง)
         canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.font = 'bold 28px Sarabun';
+        canvasCtx.font = 'bold 36px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(block.value, block.x + block.w/2, block.y + block.h/2);
         
-        // วาดตัวเลขลำดับ 1-8 สีเทาจางๆ ด้านใต้บล็อกตามภาพเรฟ
-        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        canvasCtx.font = '14px Sarabun';
+        // ตัวเลขลำดับ 1-8 ด้านใต้บล็อก
+        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        canvasCtx.font = 'bold 16px Sarabun';
         canvasCtx.textBaseline = 'top';
-        canvasCtx.fillText(index + 1, block.x + block.w/2, block.y + block.h + 8);
+        canvasCtx.fillText(index + 1, block.x + block.w/2, block.y + block.h + 10);
     });
 
     if (gameState === 'CORRECT') drawOverlay('🎉 ถูกต้องเก่งมาก! 🎉', '#2ec4b6');
@@ -272,35 +260,33 @@ function drawGame(handLandmarks) {
 }
 
 function drawConfirmButton(btn, text) {
-    // วาดกล่องปุ่มทรงสี่เหลี่ยมมนสีน้ำเงินเข้มตามเรฟ
     canvasCtx.fillStyle = btn.hovered ? 'rgba(46, 204, 113, 0.95)' : 'rgba(20, 30, 55, 0.85)';
     canvasCtx.beginPath();
-    canvasCtx.roundRect(btn.x, btn.y, btn.w, btn.h, 15);
+    canvasCtx.roundRect(btn.x, btn.y, btn.w, btn.h, 18);
     canvasCtx.fill();
-    canvasCtx.lineWidth = 2;
-    canvasCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+    canvasCtx.lineWidth = 2.5;
+    canvasCtx.strokeStyle = 'rgba(255,255,255,0.4)';
     canvasCtx.stroke();
 
-    // ไอคอนรูปมือตรงกลาง
+    // ไอคอนรูปมือ
     canvasCtx.fillStyle = '#ffcc00';
-    canvasCtx.font = '24px Sarabun';
+    canvasCtx.font = '28px Sarabun';
     canvasCtx.textAlign = 'center';
     canvasCtx.textBaseline = 'middle';
-    canvasCtx.fillText('🖐️', btn.x + btn.w/2, btn.y + btn.h/2 - 12);
+    canvasCtx.fillText('🖐️', btn.x + btn.w/2, btn.y + btn.h/2 - 14);
 
-    // ข้อความในปุ่ม
+    // ข้อความในปุ่มปรับสเกลตามขนาดใหม่
     canvasCtx.fillStyle = '#ffffff';
-    canvasCtx.font = 'bold 12px Sarabun';
-    canvasCtx.fillText('กางมือยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 15);
-    canvasCtx.font = '10px Sarabun';
+    canvasCtx.font = 'bold 13px Sarabun';
+    canvasCtx.fillText('กางมือยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 18);
+    canvasCtx.font = '11px Sarabun';
     canvasCtx.fillStyle = 'rgba(255,255,255,0.6)';
-    canvasCtx.fillText(text, btn.x + btn.w/2, btn.y + btn.h/2 + 28);
+    canvasCtx.fillText(text, btn.x + btn.w/2, btn.y + btn.h/2 + 33);
 
-    // เกจโหลดวงกลมเมื่อกางมือค้างไว้
     if (btn.hoverProgress > 0) {
         canvasCtx.beginPath();
-        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 - 10, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
-        canvasCtx.lineWidth = 4;
+        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 - 12, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
+        canvasCtx.lineWidth = 5;
         canvasCtx.strokeStyle = '#2ecc71';
         canvasCtx.stroke();
     }
@@ -323,17 +309,14 @@ function processHandTracking(landmarks) {
     const pinchY = (thumb.y + indexFinger.y) / 2;
     const distance = Math.sqrt(Math.pow(landmarks[4].x - landmarks[8].x, 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
     
-    // ตรวจจับการกางฝ่ามือ (เทียบพิกัดปลายนิ้วกับข้อต่อนิ้ว)
     const isPalmOpen = landmarks[12].y < landmarks[10].y && landmarks[16].y < landmarks[14].y; 
 
-    // วาดจุดกึ่งกลางและเส้นวงกลมเป้าเล็งล็อกนิ้วแบบมินิมอลตามเรฟภาพ
     canvasCtx.beginPath();
-    canvasCtx.arc(pinchX, pinchY, 14, 0, Math.PI * 2);
+    canvasCtx.arc(pinchX, pinchY, 15, 0, Math.PI * 2);
     canvasCtx.strokeStyle = distance < pinchThreshold ? '#ff3366' : '#ffffff';
-    canvasCtx.lineWidth = 2;
+    canvasCtx.lineWidth = 2.5;
     canvasCtx.stroke();
 
-    // วาดจุดจับพิกัดโครงมือสีขาวจางๆ ให้ดูเท่แบบ AR
     canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
     landmarks.forEach(lm => {
         canvasCtx.beginPath();
@@ -391,15 +374,13 @@ function checkButtonHover(btn, px, py, isPalmOpen) {
 }
 
 function realignBlocks() {
-    const blockWidth = 70;
-    const blockHeight = 70;
-    const spacing = 15;
-    const totalWidth = (blockWidth * 8) + (spacing * 7);
+    const spacing = 18;
+    const totalWidth = (BLOCK_WIDTH * 8) + (spacing * 7);
     const startX = (canvasElement.width - totalWidth) / 2;
-    const startY = (canvasElement.height / 2) - (blockHeight / 2);
+    const startY = (canvasElement.height / 2) - (BLOCK_HEIGHT / 2);
     
     blocks.forEach((block, index) => {
-        block.x = startX + (index * (blockWidth + spacing));
+        block.x = startX + (index * (BLOCK_WIDTH + spacing));
         block.y = startY;
     });
 }
@@ -453,4 +434,3 @@ function startMediaPipe() {
 </body>
 </html>
 
-```
