@@ -6,7 +6,7 @@
     <title>เกม AR บล็อกตัวเลขแสนสนุก</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -114,14 +114,14 @@ let blocks = [];
 let gameState = 'PLAYING'; 
 let feedbackTimer = 0;
 
-// ==========================================
-// [จุดสำคัญ] ตั้งค่าตัวแปรปุ่มยืนยันวงกลมส้ม
-// ==========================================
+// ===================================================
+// [ปรับปรุง] ตั้งขนาดปุ่มยืนยันให้กะทัดรัดขึ้นเพื่อให้ขยับมาใกล้บล็อกได้พอดี
+// ===================================================
 let confirmBtn = { 
-    x: 60,          // ระยะห่างจากขอบซ้าย 60 พิกเซล
-    y: 0,           // พิกัดแนวตั้ง (จะถูกคำนวณใหม่ในฟังก์ชัน resizeCanvas)
-    w: 120,         // ความกว้างของปุ่ม 120 พิกเซล
-    h: 120,         // ความสูงของปุ่ม 120 พิกเซล
+    x: 0,           // พิกัดแนวนอน (จะคำนวณให้อยู่ใต้บล็อกตัวเลขแรกๆ ในฟังก์ชัน resizeCanvas)
+    y: 0,           // พิกัดแนวตั้ง 
+    w: 110,         // ความกว้างปุ่ม 110 พิกเซล
+    h: 110,         // ความสูงปุ่ม 110 พิกเซล
     hovered: false, 
     hoverProgress: 0 
 };
@@ -136,12 +136,6 @@ const BLOCK_HEIGHT = 90;
 function resizeCanvas() {
     canvasElement.width = window.innerWidth;
     canvasElement.height = window.innerHeight;
-    
-    // ==========================================
-    // [จุดสำคัญ] คำนวณตำแหน่งปุ่มให้อยู่ในกรอบสีแดงของคุณครู
-    // ==========================================
-    // ใช้ความสูงหน้าจอทั้งหมด ลบออก 320 พิกเซล เพื่อดึงปุ่มลอยขึ้นมาเหนือแถบโทรศัพท์มือถือ
-    confirmBtn.y = canvasElement.height - 320; 
     
     if (blocks.length > 0) {
         realignBlocks();
@@ -174,6 +168,14 @@ function generateQuestion() {
             color: `hsl(${(index * 45) % 360}, 85%, 60%)`
         };
     });
+
+    // ===================================================
+    // [จุดแก้ไขสำคัญ] ดึงปุ่มขึ้นสูงและขยับเข้ามาให้อยู่ใต้แถวตัวเลข
+    // ===================================================
+    // วางปุ่มให้อยู่ใต้บล็อกตัวเลขตัวที่ 2 (index 1) เพื่อให้ขยับเข้ามากลางจอที่กล้องเห็นมือชัดเจน
+    confirmBtn.x = startX + (1 * (BLOCK_WIDTH + spacing)) - 10;
+    // ให้ปุ่มอยู่ห่างลงมาจากใต้บล็อกตัวเลขเพียง 50 พิกเซลเท่านั้น (ใกล้และสูงพ้นขอบล่างแน่นอน)
+    confirmBtn.y = startY + BLOCK_HEIGHT + 50; 
 }
 
 function checkAnswer() {
@@ -201,6 +203,7 @@ function checkAnswer() {
 function drawGame(handLandmarks) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
+    // 1. แถบสถานะด้านบน
     canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     canvasCtx.fillRect(0, 0, canvasElement.width, 50);
     
@@ -226,11 +229,10 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillText(labelText, canvasElement.width / 2, 31);
 
-    // ==========================================
-    // [จุดสำคัญ] วาดปุ่มวงกลมส้มในจุดใหม่พิกัดที่เลือกไว้
-    // ==========================================
+    // 2. วาดปุ่มวงกลมส้มในพิกัดใหม่ที่ยกสูงขึ้นและใกล้แถวตัวเลข
     drawConfirmButton(confirmBtn);
 
+    // 3. วาดบล็อกตัวเลข
     blocks.forEach((block, index) => {
         canvasCtx.fillStyle = block.color;
         if (draggedBlockIndex === index) {
@@ -263,35 +265,29 @@ function drawGame(handLandmarks) {
     if (handLandmarks) processHandTracking(handLandmarks);
 }
 
-// ==========================================
-// ฟังก์ชันวาดปุ่มวงกลมสีส้ม
-// ==========================================
 function drawConfirmButton(btn) {
     canvasCtx.shadowBlur = 10;
     canvasCtx.shadowColor = 'rgba(0,0,0,0.3)';
     canvasCtx.beginPath();
-    // วาดวงกลมตรงกึ่งกลางพิกัด x, y ของวัตถุ
     canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2, 0, Math.PI * 2);
-    // ถ้าเอามือมาค้างไว้จะเปลี่ยนเป็นสีเขียว ถ้าปล่อยจะเป็นสีส้ม
     canvasCtx.fillStyle = btn.hovered ? '#2ecc71' : '#e67e22';
     canvasCtx.fill();
-    canvasCtx.lineWidth = 5;
+    canvasCtx.lineWidth = 4;
     canvasCtx.strokeStyle = '#ffffff';
     canvasCtx.stroke();
 
     canvasCtx.shadowBlur = 0;
     canvasCtx.fillStyle = '#ffffff';
-    canvasCtx.font = 'bold 20px Sarabun';
+    canvasCtx.font = 'bold 18px Sarabun';
     canvasCtx.textAlign = 'center';
     canvasCtx.textBaseline = 'middle';
-    canvasCtx.fillText('กางมือ', btn.x + btn.w/2, btn.y + btn.h/2 - 16);
-    canvasCtx.fillText('ยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 16);
+    canvasCtx.fillText('กางมือ', btn.x + btn.w/2, btn.y + btn.h/2 - 14);
+    canvasCtx.fillText('ยืนยัน', btn.x + btn.w/2, btn.y + btn.h/2 + 14);
 
-    // หลอดโหลดวงกลมสีเขียวรอบนอกเวลากางมือค้างไว้
     if (btn.hoverProgress > 0) {
         canvasCtx.beginPath();
-        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 + 8, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
-        canvasCtx.lineWidth = 6;
+        canvasCtx.arc(btn.x + btn.w/2, btn.y + btn.h/2, btn.w/2 + 6, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (btn.hoverProgress / 40)));
+        canvasCtx.lineWidth = 5;
         canvasCtx.strokeStyle = '#2ef17c';
         canvasCtx.stroke();
     }
@@ -331,9 +327,6 @@ function processHandTracking(landmarks) {
 
     if (gameState !== 'PLAYING') return;
 
-    // ==========================================
-    // [จุดสำคัญ] เช็กว่าสัญลักษณ์มือชนกับปุ่มยืนยันซ้ายอันใหม่ตัวนี้ตัวเดียวหรือไม่
-    // ==========================================
     checkButtonHover(confirmBtn, pinchX, pinchY, isPalmOpen);
 
     if (distance < pinchThreshold) {
@@ -390,6 +383,10 @@ function realignBlocks() {
         block.x = startX + (index * (BLOCK_WIDTH + spacing));
         block.y = startY;
     });
+
+    // อัปเดตตำแหน่งปุ่มให้สัมพันธ์กับจอเวลารีไซส์
+    confirmBtn.x = startX + (1 * (BLOCK_WIDTH + spacing)) - 10;
+    confirmBtn.y = startY + BLOCK_HEIGHT + 50; 
 }
 
 function requestCamera() {
