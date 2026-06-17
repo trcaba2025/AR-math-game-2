@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันเลือกโหมดภาษา + ย้ายกลางจอ)</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันคำศัพท์อยู่ใต้ภาพ)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
@@ -72,7 +72,7 @@ const animalPool = [
     { id: 'frog', emoji: '🐸', th: 'กบ', en: 'Frog' }
 ];
 
-let gameMode = 'th'; // โหมดภาษาเริ่มต้น
+let gameMode = 'th'; 
 let currentQuestion = 1;
 const totalQuestions = 5;
 let score = 0;
@@ -84,13 +84,13 @@ let targetAnimals = [];
 let vocabBlocks = [];   
 
 let draggedBlockIndex = null;
-let pinchThreshold = 0.085; // ปรับเพิ่มความเหนียวในการจับนิ้ว
+let pinchThreshold = 0.085; 
 let isPinching = false;
 
-// ปรับขนาดการแสดงผลให้เหมาะสมและกระชับขึ้น
-const TARGET_SIZE = 110;
-const VOCAB_W = 160;
-const VOCAB_H = 60;
+// ขนาดบล็อกที่สมดุล สัมพันธ์กับช่องว่างใต้ภาพ
+const TARGET_SIZE = 95;
+const VOCAB_W = 145;
+const VOCAB_H = 45;
 
 function selectMode(mode) {
     gameMode = mode;
@@ -130,19 +130,19 @@ function generateRound() {
 
 function initPositions() {
     const screenCenterX = canvasElement.width / 2;
-    const startY = 150;
-    const spacingY = 135;
+    const startY = 130;
+    const spacingY = 145; // เพิ่มระยะห่างแถวตั้งเล็กน้อย เพื่อให้คำศัพท์ไปอยู่ใต้ภาพได้แบบสบายๆ ไม่เบียดกัน
 
-    // [ย้ายเข้ากลางจอ] บีบกลุ่มรูปสัตว์ให้เข้ามาใกล้เส้นกลางจอฝั่งซ้ายมากขึ้น
+    // วางกลุ่มรูปสัตว์กลางจอฝั่งซ้าย
     targetAnimals.forEach((animal, idx) => {
         animal.x = screenCenterX - 210; 
         animal.y = startY + (idx * spacingY);
     });
 
-    // [ย้ายเข้ากลางจอ] บีบกลุ่มคำศัพท์ให้ขยับเข้ามาใกล้เส้นกลางจอฝั่งขวา ลากระยะสั้นๆ มือไม่หลุดกล้อง
+    // วางกลุ่มคำศัพท์กลางจอฝั่งขวา
     vocabBlocks.forEach((block, idx) => {
-        block.homeX = screenCenterX + 50;
-        block.homeY = startY + (idx * spacingY) + 25;
+        block.homeX = screenCenterX + 55;
+        block.homeY = startY + (idx * spacingY) + 25; // วางระนาบเดียวกันในตอนเริ่มต้นให้เด็กๆ สังเกตง่าย
 
         if (!block.matched) {
             block.x = block.homeX;
@@ -165,7 +165,7 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillStyle = '#f1c40f';
     const modeText = gameMode === 'th' ? '🇹🇭 ภาษาไทย' : '🇺🇸 ภาษาอังกฤษ';
-    canvasCtx.fillText(`🎯 โหมด: ${modeText} | ลากคำศัพท์ขวา มาวางทับบนรูปสัตว์ซ้ายให้ถูกต้อง`, canvasElement.width / 2, 38);
+    canvasCtx.fillText(`🎯 โหมด: ${modeText} | ลากคำศัพท์มาวางจับคู่ใต้รูปภาพให้ถูกต้อง`, canvasElement.width / 2, 38);
 
     canvasCtx.textAlign = 'right';
     canvasCtx.fillStyle = '#2ecc71';
@@ -181,7 +181,7 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
-        canvasCtx.font = '65px Sarabun';
+        canvasCtx.font = '55px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(animal.emoji, animal.x + TARGET_SIZE/2, animal.y + TARGET_SIZE/2);
@@ -190,22 +190,22 @@ function drawGame(handLandmarks) {
     // วาดบล็อกคำศัพท์
     vocabBlocks.forEach((block, index) => {
         if (block.matched) {
-            canvasCtx.fillStyle = '#2ecc71'; 
+            canvasCtx.fillStyle = '#2ecc71'; // จับคู่ถูกเป็นสีเขียว
         } else if (draggedBlockIndex === index) {
-            canvasCtx.fillStyle = '#f1c40f'; 
+            canvasCtx.fillStyle = '#f1c40f'; // ตอนลากเป็นสีเหลือง
         } else {
             canvasCtx.fillStyle = gameMode === 'th' ? '#3498db' : '#9b59b6'; 
         }
 
         canvasCtx.beginPath();
-        canvasCtx.roundRect(block.x, block.y, VOCAB_W, VOCAB_H, 15);
+        canvasCtx.roundRect(block.x, block.y, VOCAB_W, VOCAB_H, 12);
         canvasCtx.fill();
-        canvasCtx.lineWidth = 3;
+        canvasCtx.lineWidth = 2.5;
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
         canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.font = 'bold 22px Sarabun';
+        canvasCtx.font = 'bold 18px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(block.text, block.x + VOCAB_W/2, block.y + VOCAB_H/2);
@@ -271,9 +271,9 @@ function processHandTracking(landmarks) {
             let currentBlock = vocabBlocks[draggedBlockIndex];
             let matchedTarget = null;
 
-            // ตรวจสอบการปล่อยบล็อกขอบเขตตัวสัตว์ (ขยายขอบเขตให้ติดง่ายขึ้น)
+            // เช็กการลากเข้าชนพิกัดรูปภาพสัตว์
             targetAnimals.forEach(animal => {
-                if (pinchX > animal.x - 50 && pinchX < animal.x + TARGET_SIZE + 100 && pinchY > animal.y - 40 && pinchY < animal.y + TARGET_SIZE + 40) {
+                if (pinchX > animal.x - 40 && pinchX < animal.x + TARGET_SIZE + 80 && pinchY > animal.y - 30 && pinchY < animal.y + TARGET_SIZE + 40) {
                     matchedTarget = animal;
                 }
             });
@@ -283,9 +283,9 @@ function processHandTracking(landmarks) {
                     currentBlock.matched = true;
                     score += 10;
                     
-                    // เมื่อถูกแล้ว ให้บล็อกเข้าไปเสียบวางซ้อนไว้ตรงกลางตัวภาพสัตว์อย่างสวยงาม ไม่ทับข้ออื่นแน่นอน
+                    // [แก้ไขจุดสำคัญ] จัดตำแหน่งบล็อกเมื่อจับคู่ถูก ให้เลื่อนไปจัดระเบียบอยู่ "ใต้รูปภาพสัตว์" พอดีเป๊ะ
                     currentBlock.x = matchedTarget.x + (TARGET_SIZE - VOCAB_W) / 2;
-                    currentBlock.y = matchedTarget.y + (TARGET_SIZE - VOCAB_H) / 2;
+                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 6; 
 
                     checkRoundComplete();
                 } else {
