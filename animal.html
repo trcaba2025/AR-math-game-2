@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกม AR จับคู่คำศัพท์สัตว์แสนสนุก</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #000; font-family: 'Sarabun', sans-serif; user-select: none;
+        }
+        #video-container { position: relative; width: 100vw; height: 100vh; }
+        video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
+        #permission-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(135deg, #2c3e50 0%, #1e272e 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; color: white; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+        .btn-start {
+            background-color: #2ecc71; color: white; border: none; padding: 20px 40px;
+            font-size: 28px; font-family: 'Sarabun', sans-serif; font-weight: bold;
+            border-radius: 50px; cursor: pointer; box-shadow: 0 10px 20px rgba(46, 204, 113, 0.4);
+            transition: all 0.2s; margin-top: 30px; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div id="permission-overlay">
+        <h1 style="font-size: 42px; margin-bottom: 10px; color: #f1c40f;">🦁 เกม AR จับคู่คำศัพท์สัตว์แสนสนุก 🐥</h1>
+        <p style="font-size: 22px; max-width: 600px; line-height: 1.6; color: #f5f6fa;">
+            ใช้หนึ่งนิ้วจีบเพื่อลากคำศัพท์ฝั่งขวา <br>
+            มาวางจับคู่บนตัวสัตว์ฝั่งซ้ายให้ถูกต้องนะครับเด็กๆ !
+        </p>
+        <button class="btn-start" onclick="requestCamera()">เข้าสู่เกมกล้องจับคู่ 🚀</button>
+        <p id="error-text" style="color: #ff6b6b; font-size: 18px; margin-top: 20px; display: none;"></p>
+    </div>
+
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="ar-canvas"></canvas>
+    </div>
+
+<script>
+const videoElement = document.getElementById('webcam');
+const canvasElement = document.getElementById('ar-canvas');
+const canvasCtx = canvasElement.getContext('2d');
+const permissionOverlay = document.getElementById('permission-overlay');
+const errorText = document.getElementById('error-text');
+
+// --- คลังข้อมูลคำศัพท์และรูปภาพสัตว์ (Emoji แทนรูปภาพเพื่อความสะดวก ไม่ต้องโหลดไฟล์ภาพแยก) ---
+const animalPool = [
+    { id: 'dog', emoji: '🐶', th: 'สุนัข', en: 'Dog' },
+    { id: 'cat', emoji: '🐱', th: 'แมว', en: 'Cat' },
+    { id: 'lion', emoji: '🦁', th: 'สิงโต', en: 'Lion' },
+    { id: 'bird', emoji: '🐥', th: 'นก', en: 'Bird' },
+    { id: 'elephant', emoji: '🐘', th: 'ช้าง', en: 'Elephant' },
+    { id: 'monkey', emoji: '🐵', th: 'ลิง', en: 'Monkey' },
+    { id: 'rabbit', emoji: '🐰', th: 'กระต่าย', en: 'Rabbit' },
+    { id: 'frog', emoji: '🐸', th: 'กบ', en: 'Frog' }
+];
+
+let currentQuestion = 1;
+const totalQuestions = 5;
+let score = 0;
+let gameState = 'PLAYING'; // PLAYING, FEEDBACK, GAMEOVER
+let feedbackText = '';
+let feedbackColor = '#2ec4b6';
+
+let targetAnimals = []; // ฝั่งซ้าย (รูปสัตว์)
+let vocabBlocks = [];   // ฝั่งขวา (คำศัพท์)
+
+let draggedBlockIndex = null;
+let pinchThreshold = 0.04;
+let isPinching = false;
+
+const TARGET_SIZE = 110;
+const VOCAB_W = 160;
+const VOCAB_H = 60;
+
+function resizeCanvas() {
+    canvasElement.width = window.innerWidth;
+    canvasElement.height = window.innerHeight;
+    if (targetAnimals.length > 0) initPositions();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// สุ่มเลือกสัตว์ 4 ตัวมาทำโจทย์ในรอบนั้นๆ
+function generateRound() {
+    gameState = 'PLAYING';
+    
+    // Shuffle เลือกสัตว์แบบไม่ซ้ำมา 4 ชนิด
+    let shuffledPool = [...animalPool].sort(() => Math.random() - 0.5);
+    let selectedAnimals = shuffledPool.slice(0, 4);
+
+    // ฝั่งซ้าย: การ์ดรูปสัตว์
+    targetAnimals = selectedAnimals.map((animal) => ({
+        ...animal,
+        matched: false,
+        x: 0, y: 0
+    }));
+
+    // ฝั่งขวา: บล็อกคำศัพท์รวมไทย-อังกฤษ
+    vocabBlocks = [];
+    selectedAnimals.forEach(animal => {
+        vocabBlocks.push({ id: animal.id, type: 'th', text: animal.th, x: 0, y: 0, homeX: 0, homeY: 0, matched: false });
+        vocabBlocks.push({ id: animal.id, type: 'en', text: animal.en, x: 0, y: 0, homeX: 0, homeY: 0, matched: false });
+    });
+    // สับเปลี่ยนตำแหน่งบล็อกคำศัพท์ไม่ให้เรียงตรงกับสัตว์
+    vocabBlocks.sort(() => Math.random() - 0.5);
+
+    initPositions();
+}
+
+// คำนวณพิกัดหน้าจอ แบ่งฝั่ง ซ้าย-ขวา
+function initPositions() {
+    const startY = 120;
+    const spacingY = 130;
+
+    // ตั้งพิกัดการ์ดสัตว์ฝั่งซ้าย
+    targetAnimals.forEach((animal, idx) => {
+        animal.x = 120; 
+        animal.y = startY + (idx * spacingY);
+    });
+
+    // ตั้งพิกัดบล็อกคำศัพท์ฝั่งขวา (แบ่งเป็นสองคอลัมน์เล็กๆ ในฝั่งขวา)
+    vocabBlocks.forEach((block, idx) => {
+        let col = idx % 2;
+        let row = Math.floor(idx / 2);
+        
+        let targetX = canvasElement.width - 380 + (col * (VOCAB_W + 20));
+        let targetY = startY + (row * (VOCAB_H + 35)) + 20;
+
+        block.homeX = targetX;
+        block.homeY = targetY;
+
+        // ถ้ายังไม่ได้จับคู่สำเร็จ ให้กลับไปอยู่ที่เดิม
+        if (!block.matched) {
+            block.x = targetX;
+            block.y = targetY;
+        }
+    });
+}
+
+function drawGame(handLandmarks) {
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    // 1. แถบสถานะด้านบน
+    canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    canvasCtx.fillRect(0, 0, canvasElement.width, 60);
+    
+    canvasCtx.font = 'bold 22px Sarabun';
+    canvasCtx.fillStyle = '#ffffff';
+    canvasCtx.textAlign = 'left';
+    canvasCtx.fillText(`รอบที่: ${currentQuestion}/${totalQuestions}`, 30, 38);
+    
+    canvasCtx.textAlign = 'center';
+    canvasCtx.fillStyle = '#f1c40f';
+    canvasCtx.fillText(`🎯 จับคู่ภาพสัตว์ กับคำศัพท์ภาษาไทยและอังกฤษให้ครบทุกตัว`, canvasElement.width / 2, 38);
+
+    canvasCtx.textAlign = 'right';
+    canvasCtx.fillStyle = '#2ecc71';
+    canvasCtx.fillText(`⭐ คะแนน: ${score}`, canvasElement.width - 30, 38);
+
+    // 2. วาดช่องเป้าหมายฝั่งซ้าย (รูปสัตว์)
+    targetAnimals.forEach(animal => {
+        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        canvasCtx.beginPath();
+        canvasCtx.roundRect(animal.x, animal.y, TARGET_SIZE, TARGET_SIZE, 20);
+        canvasCtx.fill();
+        canvasCtx.lineWidth = 4;
+        canvasCtx.strokeStyle = '#ffffff';
+        canvasCtx.stroke();
+
+        // วาดรูปสัตว์ (Emoji)
+        canvasCtx.font = '65px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.textBaseline = 'middle';
+        canvasCtx.fillText(animal.emoji, animal.x + TARGET_SIZE/2, animal.y + TARGET_SIZE/2);
+    });
+
+    // 3. วาดบล็อกคำศัพท์ฝั่งขวา
+    vocabBlocks.forEach((block, index) => {
+        if (block.matched) {
+            canvasCtx.fillStyle = '#2ecc71'; // สีเขียวถ้าถูกแล้ว
+        } else if (draggedBlockIndex === index) {
+            canvasCtx.fillStyle = '#f1c40f'; // สีเหลืองตอนกำลังลาก
+        } else {
+            canvasCtx.fillStyle = block.type === 'th' ? '#3498db' : '#9b59b6'; // แยกสี ไทย-อังกฤษ
+        }
+
+        canvasCtx.beginPath();
+        canvasCtx.roundRect(block.x, block.y, VOCAB_W, VOCAB_H, 12);
+        canvasCtx.fill();
+        canvasCtx.lineWidth = 2.5;
+        canvasCtx.strokeStyle = '#ffffff';
+        canvasCtx.stroke();
+
+        // ข้อความคำศัพท์
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.font = 'bold 20px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.textBaseline = 'middle';
+        canvasCtx.fillText(block.text, block.x + VOCAB_W/2, block.y + VOCAB_H/2);
+    });
+
+    // วาดหน้าต่างแจ้งเตือน Feedback
+    if (gameState === 'FEEDBACK') {
+        canvasCtx.fillStyle = 'rgba(0,0,0,0.4)';
+        canvasCtx.fillRect(0, 60, canvasElement.width, canvasElement.height);
+        
+        canvasCtx.fillStyle = feedbackColor;
+        canvasCtx.font = 'bold 36px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.fillText(feedbackText, canvasElement.width / 2, canvasElement.height / 2);
+    } else if (gameState === 'GAMEOVER') {
+        canvasCtx.fillStyle = 'rgba(0,0,0,0.85)';
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.fillStyle = '#f1c40f';
+        canvasCtx.font = 'bold 45px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.fillText(`🏁 จบเกมการแข่งขันแล้วครับ! 🏁`, canvasElement.width / 2, canvasElement.height / 2 - 30);
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.font = 'bold 32px Sarabun';
+        canvasCtx.fillText(`เด็กๆ ได้คะแนนรวมทั้งหมด: ${score} คะแนน`, canvasElement.width / 2, canvasElement.height / 2 + 30);
+        return;
+    }
+
+    if (handLandmarks) processHandTracking(handLandmarks);
+}
+
+function processHandTracking(landmarks) {
+    const thumb = { x: (1 - landmarks[4].x) * canvasElement.width, y: landmarks[4].y * canvasElement.height };
+    const indexFinger = { x: (1 - landmarks[8].x) * canvasElement.width, y: landmarks[8].y * canvasElement.height };
+    const pinchX = (thumb.x + indexFinger.x) / 2;
+    const pinchY = (thumb.y + indexFinger.y) / 2;
+    const distance = Math.sqrt(Math.pow(landmarks[4].x - landmarks[8].x, 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
+
+    // ตัวชี้ตำแหน่งมือบนจอ
+    canvasCtx.beginPath();
+    canvasCtx.arc(pinchX, pinchY, 14, 0, Math.PI * 2);
+    canvasCtx.strokeStyle = distance < pinchThreshold ? '#ff3366' : '#ffffff';
+    canvasCtx.lineWidth = 3;
+    canvasCtx.stroke();
+
+    if (gameState !== 'PLAYING') return;
+
+    // การลากวางคำศัพท์ด้วยการจีบนิ้ว
+    if (distance < pinchThreshold) {
+        if (!isPinching) {
+            // เช็คว่าจีบโดนบล็อกคำศัพท์ตัวไหน (และต้องเป็นตัวที่ยังจับคู่ไม่สำเร็จ)
+            vocabBlocks.forEach((block, idx) => {
+                if (!block.matched && pinchX > block.x && pinchX < block.x + VOCAB_W && pinchY > block.y && pinchY < block.y + VOCAB_H) {
+                    draggedBlockIndex = idx;
+                    isPinching = true;
+                }
+            });
+        } else if (draggedBlockIndex !== null) {
+            // ขยับบล็อกตามมือลาก
+            vocabBlocks[draggedBlockIndex].x = pinchX - VOCAB_W / 2;
+            vocabBlocks[draggedBlockIndex].y = pinchY - VOCAB_H / 2;
+        }
+    } else {
+        // เมื่อปล่อยมือ: ตรวจสอบการจับคู่คำตอบทันที
+        if (isPinching && draggedBlockIndex !== null) {
+            let currentBlock = vocabBlocks[draggedBlockIndex];
+            let matchedTarget = null;
+
+            // ตรวจสอบว่าบล็อกถูกปล่อยลงบนพื้นที่รูปสัตว์ตัวไหนหรือไม่
+            targetAnimals.forEach(animal => {
+                if (pinchX > animal.x && pinchX < animal.x + TARGET_SIZE && pinchY > animal.y && pinchY < animal.y + TARGET_SIZE) {
+                    matchedTarget = animal;
+                }
+            });
+
+            if (matchedTarget) {
+                // เงื่อนไข: ถ้า ID ของคำศัพท์ ตรงกับ ID ของสัตว์ชนิดนั้นเป๊ะ (จับคู่ถูกต้อง)
+                if (currentBlock.id === matchedTarget.id) {
+                    currentBlock.matched = true;
+                    score += 10;
+                    
+                    // ปรับตำแหน่งให้คำศัพท์เข้าไปแปะอยู่ติดตัวสัตว์สวยงาม
+                    currentBlock.x = matchedTarget.x + (currentBlock.type === 'th' ? -25 : 100);
+                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 5;
+
+                    checkRoundComplete();
+                } else {
+                    // ===================================================
+                    // [จุดแก้ไขสำคัญตามสั่ง] ถ้าจับคู่ไม่ถูก จะแจ้งเตือนแล้วดีดกลับที่เดิม
+                    // ===================================================
+                    gameState = 'FEEDBACK';
+                    feedbackText = '❌ ลองจับคู่ใหม่อีกครั้งนะจ๊ะ! ❌';
+                    feedbackColor = '#e71d36';
+
+                    // สั่งให้ดีดกลับไปตำแหน่งเริ่มต้นฝั่งขวา
+                    currentBlock.x = currentBlock.homeX;
+                    currentBlock.y = currentBlock.homeY;
+
+                    setTimeout(() => { 
+                        if(gameState === 'FEEDBACK') gameState = 'PLAYING'; 
+                    }, 1500);
+                }
+            } else {
+                // ปล่อยนอกพื้นที่เป้าหมาย ให้ดีดกลับบ้านฝั่งขวาเงียบๆ
+                currentBlock.x = currentBlock.homeX;
+                currentBlock.y = currentBlock.homeY;
+            }
+        }
+        isPinching = false;
+        draggedBlockIndex = null;
+    }
+}
+
+// ตรวจสอบว่าในรอบนั้นๆ เด็กๆ จับคู่บล็อกคำศัพท์ครบหมดทุกอันหรือยัง
+function checkRoundComplete() {
+    let allDone = vocabBlocks.every(b => b.matched);
+    if (allDone) {
+        gameState = 'FEEDBACK';
+        feedbackText = '🎉 สุดยอดมาก! จับคู่สัตว์ถูกต้องครบถ้วน 🎉';
+        feedbackColor = '#2ec4b6';
+
+        setTimeout(() => {
+            if (currentQuestion < totalQuestions) {
+                currentQuestion++;
+                generateRound();
+            } else {
+                gameState = 'GAMEOVER';
+            }
+        }, 2500);
+    }
+}
+
+function requestCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+    .then((stream) => {
+        permissionOverlay.style.display = 'none';
+        videoElement.srcObject = stream;
+        startMediaPipe();
+    })
+    .catch((err) => {
+        errorText.style.display = 'block';
+        errorText.innerHTML = "❌ ไม่สามารถเข้าถึงกล้องได้ครับ";
+    });
+}
+
+function startMediaPipe() {
+    const hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+        maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.75, minTrackingConfidence: 0.75
+    });
+
+    hands.onResults((results) => {
+        let handLandmarks = null;
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            handLandmarks = results.multiHandLandmarks[0];
+        }
+        drawGame(handLandmarks);
+    });
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({ image: videoElement }); },
+        width: 1280, height: 720
+    });
+    
+    camera.start();
+    resizeCanvas();
+    generateRound();
+}
+</script>
+</body>
+</html>
