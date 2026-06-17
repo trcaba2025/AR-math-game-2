@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์แสนสนุก (เวอร์ชันแก้พิกัดลากไม่หลุด)</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันปรับพิกัดกลางจอ)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
@@ -77,13 +77,13 @@ let targetAnimals = [];
 let vocabBlocks = [];   
 
 let draggedBlockIndex = null;
-// [ปรับปรุงเพิ่มความเหนียว] ขยายระยะตรวจจับนิ้วจีบเพิ่มขึ้น เพื่อให้ลากง่ายไม่หลุดมือ
-let pinchThreshold = 0.08; 
+let pinchThreshold = 0.08; // ล็อกนิ้วจีบเหนียวแน่นหนึบ
 let isPinching = false;
 
-const TARGET_SIZE = 110;
-const VOCAB_W = 160;
-const VOCAB_H = 60;
+// ปรับขนาดบล็อกและช่องให้กระชับเข้ากับพื้นที่กลางจอ
+const TARGET_SIZE = 100;
+const VOCAB_W = 140;
+const VOCAB_H = 55;
 
 function resizeCanvas() {
     canvasElement.width = window.innerWidth;
@@ -114,20 +114,23 @@ function generateRound() {
 }
 
 function initPositions() {
-    const startY = 120;
-    const spacingY = 130;
+    const screenCenterX = canvasElement.width / 2;
+    const startY = 140;
+    const spacingY = 135; // เว้นช่องไฟแนวตั้งพอดีๆ ไม่ให้เบียดกัน
 
+    // [แก้ไขพิกัด] ย้ายกลุ่มรูปสัตว์ขยับเข้ามาโซนกลางจอฝั่งซ้าย (ห่างจากจุดกึ่งกลางจอนิดเดียว)
     targetAnimals.forEach((animal, idx) => {
-        animal.x = 120; 
+        animal.x = screenCenterX - 280; 
         animal.y = startY + (idx * spacingY);
     });
 
+    // [แก้ไขพิกัด] ย้ายกลุ่มคำศัพท์ฝั่งขวาขยับเข้ามาใกล้กลางจอมากขึ้น ลากแป๊บเดียวถึงเป้าหมาย
     vocabBlocks.forEach((block, idx) => {
         let col = idx % 2;
         let row = Math.floor(idx / 2);
         
-        let targetX = canvasElement.width - 380 + (col * (VOCAB_W + 20));
-        let targetY = startY + (row * (VOCAB_H + 35)) + 20;
+        let targetX = screenCenterX + 60 + (col * (VOCAB_W + 20));
+        let targetY = startY + (row * (VOCAB_H + 40)) + 15;
 
         block.homeX = targetX;
         block.homeY = targetY;
@@ -158,6 +161,7 @@ function drawGame(handLandmarks) {
     canvasCtx.fillStyle = '#2ecc71';
     canvasCtx.fillText(`⭐ คะแนน: ${score}`, canvasElement.width - 30, 38);
 
+    // วาดรูปสัตว์
     targetAnimals.forEach(animal => {
         canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         canvasCtx.beginPath();
@@ -167,17 +171,18 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
-        canvasCtx.font = '65px Sarabun';
+        canvasCtx.font = '60px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(animal.emoji, animal.x + TARGET_SIZE/2, animal.y + TARGET_SIZE/2);
     });
 
+    // วาดบล็อกคำศัพท์
     vocabBlocks.forEach((block, index) => {
         if (block.matched) {
-            canvasCtx.fillStyle = '#2ecc71'; 
+            canvasCtx.fillStyle = '#2ecc71'; // ถูกแล้วเป็นสีเขียว
         } else if (draggedBlockIndex === index) {
-            canvasCtx.fillStyle = '#f1c40f'; 
+            canvasCtx.fillStyle = '#f1c40f'; // กำลังลากเป็นสีเหลือง
         } else {
             canvasCtx.fillStyle = block.type === 'th' ? '#3498db' : '#9b59b6'; 
         }
@@ -190,7 +195,7 @@ function drawGame(handLandmarks) {
         canvasCtx.stroke();
 
         canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.font = 'bold 20px Sarabun';
+        canvasCtx.font = 'bold 18px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(block.text, block.x + VOCAB_W/2, block.y + VOCAB_H/2);
@@ -221,7 +226,6 @@ function drawGame(handLandmarks) {
 }
 
 function processHandTracking(landmarks) {
-    // [แก้ไขจุดสำคัญ] ปรับสูตรคำนวณตำแหน่งนิ้วโป้งและนิ้วชี้แกน X ให้ล็อกพิกัดตามหน้าจอกลางกระจกเงาตรงกัน
     const thumbX = (1 - landmarks[4].x) * canvasElement.width;
     const thumbY = landmarks[4].y * canvasElement.height;
     const indexX = (1 - landmarks[8].x) * canvasElement.width;
@@ -230,7 +234,6 @@ function processHandTracking(landmarks) {
     const pinchX = (thumbX + indexX) / 2;
     const pinchY = (thumbY + indexY) / 2;
 
-    // คำนวณระยะห่างนิ้ว (Distance) แบบสัมพันธ์กับการกลับด้านกระจกเงา
     const distance = Math.sqrt(Math.pow((1 - landmarks[4].x) - (1 - landmarks[8].x), 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
 
     canvasCtx.beginPath();
@@ -258,9 +261,9 @@ function processHandTracking(landmarks) {
             let currentBlock = vocabBlocks[draggedBlockIndex];
             let matchedTarget = null;
 
-            // เพิ่มขอบเขตการดูดจับเป้าหมายตัวสัตว์ให้กว้างขึ้น เด็กๆ ปล่อยใกล้ๆ ก็ติดเข้าล็อกทันที
+            // ตรวจจับระยะปล่อยบล็อกรอบๆ ตัวสัตว์
             targetAnimals.forEach(animal => {
-                if (pinchX > animal.x - 50 && pinchX < animal.x + TARGET_SIZE + 180 && pinchY > animal.y - 40 && pinchY < animal.y + TARGET_SIZE + 60) {
+                if (pinchX > animal.x - 60 && pinchX < animal.x + TARGET_SIZE + 180 && pinchY > animal.y - 30 && pinchY < animal.y + TARGET_SIZE + 30) {
                     matchedTarget = animal;
                 }
             });
@@ -270,8 +273,14 @@ function processHandTracking(landmarks) {
                     currentBlock.matched = true;
                     score += 10;
                     
-                    currentBlock.x = matchedTarget.x + (currentBlock.type === 'th' ? -25 : 100);
-                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 5;
+                    // [แก้ไขจุดสำคัญ] จัดตำแหน่งให้บล็อกคำศัพท์ที่ถูก วางเรียงต่อกันไปทางด้านขวาของตัวสัตว์ 
+                    // ภาษาไทยอยู่ต่อจากรูปสัตว์ทันที ส่วนภาษาอังกฤษขยับไปต่อท้ายภาษาไทย ไม่ลงไปทับข้ออื่นแล้ว!
+                    if (currentBlock.type === 'th') {
+                        currentBlock.x = matchedTarget.x + TARGET_SIZE + 15;
+                    } else {
+                        currentBlock.x = matchedTarget.x + TARGET_SIZE + VOCAB_W + 30;
+                    }
+                    currentBlock.y = matchedTarget.y + (TARGET_SIZE - VOCAB_H) / 2;
 
                     checkRoundComplete();
                 } else {
