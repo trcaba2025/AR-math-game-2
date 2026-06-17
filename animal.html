@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์แสนสนุก (เวอร์ชันแก้ไขลากไม่หลุด)</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์แสนสนุก (เวอร์ชันแก้พิกัดลากไม่หลุด)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
@@ -77,8 +77,8 @@ let targetAnimals = [];
 let vocabBlocks = [];   
 
 let draggedBlockIndex = null;
-// [ปรับปรุง] เพิ่มระยะให้จับติดมือแน่นขึ้น ไม่หลุดง่ายตอนลากผ่านจอกลาง
-let pinchThreshold = 0.055; 
+// [ปรับปรุงเพิ่มความเหนียว] ขยายระยะตรวจจับนิ้วจีบเพิ่มขึ้น เพื่อให้ลากง่ายไม่หลุดมือ
+let pinchThreshold = 0.08; 
 let isPinching = false;
 
 const TARGET_SIZE = 110;
@@ -221,11 +221,17 @@ function drawGame(handLandmarks) {
 }
 
 function processHandTracking(landmarks) {
-    const thumb = { x: (1 - landmarks[4].x) * canvasElement.width, y: landmarks[4].y * canvasElement.height };
-    const indexFinger = { x: (1 - landmarks[8].x) * canvasElement.width, y: landmarks[8].y * canvasElement.height };
-    const pinchX = (thumb.x + indexFinger.x) / 2;
-    const pinchY = (thumb.y + indexFinger.y) / 2;
-    const distance = Math.sqrt(Math.pow(landmarks[4].x - landmarks[8].x, 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
+    // [แก้ไขจุดสำคัญ] ปรับสูตรคำนวณตำแหน่งนิ้วโป้งและนิ้วชี้แกน X ให้ล็อกพิกัดตามหน้าจอกลางกระจกเงาตรงกัน
+    const thumbX = (1 - landmarks[4].x) * canvasElement.width;
+    const thumbY = landmarks[4].y * canvasElement.height;
+    const indexX = (1 - landmarks[8].x) * canvasElement.width;
+    const indexY = landmarks[8].y * canvasElement.height;
+
+    const pinchX = (thumbX + indexX) / 2;
+    const pinchY = (thumbY + indexY) / 2;
+
+    // คำนวณระยะห่างนิ้ว (Distance) แบบสัมพันธ์กับการกลับด้านกระจกเงา
+    const distance = Math.sqrt(Math.pow((1 - landmarks[4].x) - (1 - landmarks[8].x), 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
 
     canvasCtx.beginPath();
     canvasCtx.arc(pinchX, pinchY, 14, 0, Math.PI * 2);
@@ -252,9 +258,9 @@ function processHandTracking(landmarks) {
             let currentBlock = vocabBlocks[draggedBlockIndex];
             let matchedTarget = null;
 
-            // [ปรับปรุง] ขยายขอบเขต Hitbox ตัวรับเป้าหมายให้กว้างขึ้น เพื่อดึงดูดคำเข้าหาตัวสัตว์ได้ง่ายขึ้น
+            // เพิ่มขอบเขตการดูดจับเป้าหมายตัวสัตว์ให้กว้างขึ้น เด็กๆ ปล่อยใกล้ๆ ก็ติดเข้าล็อกทันที
             targetAnimals.forEach(animal => {
-                if (pinchX > animal.x - 40 && pinchX < animal.x + TARGET_SIZE + 150 && pinchY > animal.y - 30 && pinchY < animal.y + TARGET_SIZE + 60) {
+                if (pinchX > animal.x - 50 && pinchX < animal.x + TARGET_SIZE + 180 && pinchY > animal.y - 40 && pinchY < animal.y + TARGET_SIZE + 60) {
                     matchedTarget = animal;
                 }
             });
