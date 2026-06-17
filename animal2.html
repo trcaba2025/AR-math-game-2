@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันภาพการ์ตูนเสมือนจริง แยกแยะง่าย)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #000; font-family: 'Sarabun', sans-serif; user-select: none; }
+        #video-container { position: relative; width: 100vw; height: 100vh; }
+        video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
+        #permission-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(135deg, #2c3e50 0%, #1e272e 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; color: white; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+        .mode-container { display: flex; gap: 20px; margin-top: 25px; }
+        .btn-mode {
+            color: white; border: none; padding: 18px 35px;
+            font-size: 24px; font-family: 'Sarabun', sans-serif; font-weight: bold;
+            border-radius: 15px; cursor: pointer; transition: all 0.2s;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+        }
+        .btn-th { background-color: #3498db; }
+        .btn-en { background-color: #9b59b6; }
+        .btn-th:hover { background-color: #2980b9; transform: scale(1.05); }
+        .btn-en:hover { background-color: #8e44ad; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <div id="permission-overlay">
+        <h1 style="font-size: 42px; margin-bottom: 5px; color: #f1c40f;">🦁 เกม AR จับคู่คำศัพท์สัตว์แสนสนุก 🐥</h1>
+        <p style="font-size: 20px; max-width: 600px; color: #f5f6fa; margin-bottom: 10px;">
+            เวอร์ชันอัปเกรด: ภาพการ์ตูนเสมือนจริง แยกแยะง่าย ไม่สับสนแน่นอนครับคุณครู! 😊
+        </p>
+        <div class="mode-container">
+            <button class="btn-mode btn-th" onclick="selectMode('th')">🇹🇭 โหมดภาษาไทย</button>
+            <button class="btn-mode btn-en" onclick="selectMode('en')">🇺🇸 โหมดภาษาอังกฤษ</button>
+        </div>
+        <p id="error-text" style="color: #ff6b6b; font-size: 18px; margin-top: 20px; display: none;"></p>
+    </div>
+
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="ar-canvas"></canvas>
+    </div>
+
+<script>
+const videoElement = document.getElementById('webcam');
+const canvasElement = document.getElementById('ar-canvas');
+const canvasCtx = canvasElement.getContext('2d');
+const permissionOverlay = document.getElementById('permission-overlay');
+const errorText = document.getElementById('error-text');
+
+// ระบบเสียงสังเคราะห์ (Web Audio API)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let bgmInterval;
+
+function playBGM() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    let index = 0;
+    bgmInterval = setInterval(() => {
+        if (gameState === 'GAMEOVER') { clearInterval(bgmInterval); return; }
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(notes[index % notes.length], audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.8);
+        index += Math.floor(Math.random() * 3) + 1;
+    }, 600);
+}
+
+function playCorrectSound() {
+    let osc1 = audioCtx.createOscillator(); let osc2 = audioCtx.createOscillator(); let gain = audioCtx.createGain();
+    osc1.type = 'sine'; osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+    osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+    osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+    osc1.start(); osc2.start(); osc1.stop(audioCtx.currentTime + 0.4); osc2.stop(audioCtx.currentTime + 0.4);
+}
+
+function playWrongSound() {
+    let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+    osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.25);
+    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+}
+
+// 🎯 เปลี่ยนจาก Emoji เป็น ลิงก์ภาพการ์ตูนเวกเตอร์ที่มีลายเส้นเสมือนจริง ชัดเจน และไม่ซ้ำซ้อนกันแน่นอนครับ!
+const animalPool = [
+    { id: 'dog', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616408.png', th: 'สุนัข', en: 'Dog' },
+    { id: 'cat', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616430.png', th: 'แมว', en: 'Cat' },
+    { id: 'lion', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616412.png', th: 'สิงโต', en: 'Lion' },
+    { id: 'bird', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616613.png', th: 'นก', en: 'Bird' },
+    { id: 'elephant', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616432.png', th: 'ช้าง', en: 'Elephant' },
+    { id: 'monkey', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616417.png', th: 'ลิง', en: 'Monkey' },
+    { id: 'rabbit', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616442.png', th: 'กระต่าย', en: 'Rabbit' },
+    { id: 'frog', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616656.png', th: 'กบ', en: 'Frog' },
+    { id: 'tiger', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616422.png', th: 'เสือ', en: 'Tiger' },
+    { id: 'bear', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616438.png', th: 'หมี', en: 'Bear' },
+    { id: 'pig', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616427.png', th: 'หมู', en: 'Pig' },
+    { id: 'cow', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616550.png', th: 'วัว', en: 'Cow' },
+    { id: 'sheep', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616447.png', th: 'แกะ', en: 'Sheep' },
+    { id: 'horse', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616405.png', th: 'ม้า', en: 'Horse' },
+    { id: 'penguin', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616643.png', th: 'เพนกวิน', en: 'Penguin' },
+    { id: 'turtle', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616688.png', th: 'เต่า', en: 'Turtle' },
+    { id: 'duck', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616634.png', th: 'เป็ด', en: 'Duck' },
+    { id: 'chicken', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616618.png', th: 'ไก่', en: 'Chicken' },
+    { id: 'bee', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616676.png', th: 'ผึ้ง', en: 'Bee' },
+    { id: 'fish', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616524.png', th: 'ปลา', en: 'Fish' }
+];
+
+// โหลดรูปภาพไว้ในหน่วยความจำล่วงหน้า เพื่อป้องกันปัญหาภาพกระพริบตอนเล่น
+const imageCache = {};
+animalPool.forEach(animal => {
+    const img = new Image();
+    img.src = animal.imgUrl;
+    img.crossOrigin = "anonymous";
+    imageCache[animal.id] = img;
+});
+
+let gameMode = 'th'; 
+let currentQuestion = 1;
+const totalQuestions = 5;
+let score = 0;
+let gameState = 'START_SCREEN'; 
+let feedbackText = '';
+let feedbackColor = '#2ec4b6';
+
+let targetAnimals = []; 
+let vocabBlocks = [];   
+let draggedBlockIndex = null;
+let pinchThreshold = 0.085; 
+let isPinching = false;
+
+// โครงสร้างขยับแถวแบบโปร่งพิเศษ แก้ไขเรื่องภาพซ้อนทับกันเด็ดขาด
+const TARGET_SIZE = 80;  
+const VOCAB_W = 125;     
+const VOCAB_H = 36;      
+
+function selectMode(mode) {
+    gameMode = mode;
+    playBGM();
+    requestCamera();
+}
+
+function resizeCanvas() {
+    canvasElement.width = window.innerWidth;
+    canvasElement.height = window.innerHeight;
+    if (targetAnimals.length > 0) initPositions();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function generateRound() {
+    gameState = 'PLAYING';
+    let shuffledPool = [...animalPool].sort(() => Math.random() - 0.5);
+    let selectedAnimals = shuffledPool.slice(0, 4);
+
+    targetAnimals = selectedAnimals.map((animal) => ({
+        ...animal,
+        matched: false,
+        x: 0, y: 0
+    }));
+
+    vocabBlocks = [];
+    selectedAnimals.forEach(animal => {
+        if (gameMode === 'th') {
+            vocabBlocks.push({ id: animal.id, text: animal.th, x: 0, y: 0, homeX: 0, homeY: 0, matched: false });
+        } else {
+            vocabBlocks.push({ id: animal.id, text: animal.en, x: 0, y: 0, homeX: 0, homeY: 0, matched: false });
+        }
+    });
+    vocabBlocks.sort(() => Math.random() - 0.5);
+
+    initPositions();
+}
+
+function initPositions() {
+    const screenCenterX = canvasElement.width / 2;
+    const startY = 105;
+    const spacingY = 170; // ล็อกช่องไฟแนวตั้งกว้าง 170px ป้องกันการทับซ้อนข้ออื่นเด็ดขาด
+
+    targetAnimals.forEach((animal, idx) => {
+        animal.x = screenCenterX - 230; 
+        animal.y = startY + (idx * spacingY);
+    });
+
+    vocabBlocks.forEach((block, idx) => {
+        block.homeX = screenCenterX + 80;
+        block.homeY = startY + (idx * spacingY) + 20; 
+
+        if (!block.matched) {
+            block.x = block.homeX;
+            block.y = block.homeY;
+        }
+    });
+}
+
+function drawGame(handLandmarks) {
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    canvasCtx.fillRect(0, 0, canvasElement.width, 60);
+    
+    canvasCtx.font = 'bold 22px Sarabun';
+    canvasCtx.fillStyle = '#ffffff';
+    canvasCtx.textAlign = 'left';
+    canvasCtx.fillText(`รอบที่: ${currentQuestion}/${totalQuestions}`, 30, 38);
+    
+    canvasCtx.textAlign = 'center';
+    canvasCtx.fillStyle = '#f1c40f';
+    const modeText = gameMode === 'th' ? '🇹🇭 ภาษาไทย' : '🇺🇸 ภาษาอังกฤษ';
+    canvasCtx.fillText(`🎯 โหมด: ${modeText} | คลังภาพการ์ตูน 20 ชนิด | ลากคำศัพท์วางใต้รูปภาพให้ถูกต้อง`, canvasElement.width / 2, 38);
+
+    canvasCtx.textAlign = 'right';
+    canvasCtx.fillStyle = '#2ecc71';
+    canvasCtx.fillText(`⭐ คะแนน: ${score}`, canvasElement.width - 30, 38);
+
+    // วาดกรอบรูปภาพสัตว์
+    targetAnimals.forEach(animal => {
+        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        canvasCtx.beginPath();
+        canvasCtx.roundRect(animal.x, animal.y, TARGET_SIZE, TARGET_SIZE, 18);
+        canvasCtx.fill();
+        canvasCtx.lineWidth = 4;
+        canvasCtx.strokeStyle = '#ffffff';
+        canvasCtx.stroke();
+
+        // ดึงภาพจาก Cache มาวาดลงในกรอบแทนการใช้ Emoji Text แบบเดิม
+        const img = imageCache[animal.id];
+        if (img && img.complete) {
+            const padding = 10; // เว้นขอบรูปเล็กน้อยเพื่อความสวยงาม
+            canvasCtx.drawImage(img, animal.x + padding, animal.y + padding, TARGET_SIZE - (padding * 2), TARGET_SIZE - (padding * 2));
+        }
+    });
+
+    // วาดบล็อกคำศัพท์
+    vocabBlocks.forEach((block, index) => {
+        if (block.matched) {
+            canvasCtx.fillStyle = '#2ecc71'; 
+        } else if (draggedBlockIndex === index) {
+            canvasCtx.fillStyle = '#f1c40f'; 
+        } else {
+            canvasCtx.fillStyle = gameMode === 'th' ? '#3498db' : '#9b59b6'; 
+        }
+
+        canvasCtx.beginPath();
+        canvasCtx.roundRect(block.x, block.y, VOCAB_W, VOCAB_H, 10);
+        canvasCtx.fill();
+        canvasCtx.lineWidth = 2.5;
+        canvasCtx.strokeStyle = '#ffffff';
+        canvasCtx.stroke();
+
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.font = 'bold 16px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.textBaseline = 'middle';
+        canvasCtx.fillText(block.text, block.x + VOCAB_W/2, block.y + VOCAB_H/2);
+    });
+
+    if (gameState === 'FEEDBACK') {
+        canvasCtx.fillStyle = 'rgba(0,0,0,0.4)';
+        canvasCtx.fillRect(0, 60, canvasElement.width, canvasElement.height);
+        canvasCtx.fillStyle = feedbackColor;
+        canvasCtx.font = 'bold 38px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.fillText(feedbackText, canvasElement.width / 2, canvasElement.height / 2);
+    } else if (gameState === 'GAMEOVER') {
+        canvasCtx.fillStyle = 'rgba(0,0,0,0.9)';
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.fillStyle = '#f1c40f';
+        canvasCtx.font = 'bold 45px Sarabun';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.fillText(`🏁 จบเกมการแข่งขันแล้วครับ! 🏁`, canvasElement.width / 2, canvasElement.height / 2 - 40);
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.font = 'bold 32px Sarabun';
+        canvasCtx.fillText(`เด็กๆ ได้คะแนนโหมดนี้ทั้งหมด: ${score} คะแนน`, canvasElement.width / 2, canvasElement.height / 2 + 30);
+        return;
+    }
+
+    if (handLandmarks) processHandTracking(handLandmarks);
+}
+
+function processHandTracking(landmarks) {
+    const thumbX = (1 - landmarks[4].x) * canvasElement.width;
+    const thumbY = landmarks[4].y * canvasElement.height;
+    const indexX = (1 - landmarks[8].x) * canvasElement.width;
+    const indexY = landmarks[8].y * canvasElement.height;
+
+    const pinchX = (thumbX + indexX) / 2;
+    const pinchY = (thumbY + indexY) / 2;
+    const distance = Math.sqrt(Math.pow((1 - landmarks[4].x) - (1 - landmarks[8].x), 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
+
+    canvasCtx.beginPath();
+    canvasCtx.arc(pinchX, pinchY, 15, 0, Math.PI * 2);
+    canvasCtx.strokeStyle = distance < pinchThreshold ? '#ff3366' : '#ffffff';
+    canvasCtx.lineWidth = 3;
+    canvasCtx.stroke();
+
+    if (gameState !== 'PLAYING') return;
+
+    if (distance < pinchThreshold) {
+        if (!isPinching) {
+            vocabBlocks.forEach((block, idx) => {
+                if (!block.matched && pinchX > block.x && pinchX < block.x + VOCAB_W && pinchY > block.y && pinchY < block.y + VOCAB_H) {
+                    draggedBlockIndex = idx;
+                    isPinching = true;
+                }
+            });
+        } else if (draggedBlockIndex !== null) {
+            vocabBlocks[draggedBlockIndex].x = pinchX - VOCAB_W / 2;
+            vocabBlocks[draggedBlockIndex].y = pinchY - VOCAB_H / 2;
+        }
+    } else {
+        if (isPinching && draggedBlockIndex !== null) {
+            let currentBlock = vocabBlocks[draggedBlockIndex];
+            let matchedTarget = null;
+
+            targetAnimals.forEach(animal => {
+                if (pinchX > animal.x - 50 && pinchX < animal.x + TARGET_SIZE + 90 && pinchY > animal.y - 40 && pinchY < animal.y + TARGET_SIZE + 50) {
+                    matchedTarget = animal;
+                }
+            });
+
+            if (matchedTarget) {
+                if (currentBlock.id === matchedTarget.id) {
+                    currentBlock.matched = true;
+                    score += 10;
+                    playCorrectSound(); 
+                    
+                    currentBlock.x = matchedTarget.x + (TARGET_SIZE - VOCAB_W) / 2;
+                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 18; // อยู่ใต้ภาพตัวมันเองพอดี ไม่โดนเบียด
+
+                    checkRoundComplete();
+                } else {
+                    playWrongSound(); 
+                    gameState = 'FEEDBACK';
+                    feedbackText = '❌ ลองจับคู่ใหม่อีกครั้งนะจ๊ะ! ❌';
+                    feedbackColor = '#e71d36';
+                    currentBlock.x = currentBlock.homeX;
+                    currentBlock.y = currentBlock.homeY;
+                    setTimeout(() => { if(gameState === 'FEEDBACK') gameState = 'PLAYING'; }, 1200);
+                }
+            } else {
+                currentBlock.x = currentBlock.homeX;
+                currentBlock.y = currentBlock.homeY;
+            }
+        }
+        isPinching = false;
+        draggedBlockIndex = null;
+    }
+}
+
+function checkRoundComplete() {
+    let allDone = vocabBlocks.every(b => b.matched);
+    if (allDone) {
+        gameState = 'FEEDBACK';
+        feedbackText = '🎉 เก่งมากเลยครับ! จับคู่สัตว์ถูกต้องครบถ้วน 🎉';
+        feedbackColor = '#2ec4b6';
+        setTimeout(() => {
+            if (currentQuestion < totalQuestions) {
+                currentQuestion++;
+                generateRound();
+            } else {
+                gameState = 'GAMEOVER';
+            }
+        }, 2000);
+    }
+}
+
+function requestCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+    .then((stream) => {
+        permissionOverlay.style.display = 'none';
+        videoElement.srcObject = stream;
+        startMediaPipe();
+    })
+    .catch((err) => {
+        errorText.style.display = 'block';
+        errorText.innerHTML = "❌ ไม่สามารถเข้าถึงกล้องได้ครับ";
+    });
+}
+
+function startMediaPipe() {
+    const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.75, minTrackingConfidence: 0.75 });
+    hands.onResults((results) => {
+        let handLandmarks = null;
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            handLandmarks = results.multiHandLandmarks[0];
+        }
+        drawGame(handLandmarks);
+    });
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({ image: videoElement }); },
+        width: 1280, height: 720
+    });
+    camera.start();
+    resizeCanvas();
+    generateRound();
+}
+</script>
+</body>
+</html>
