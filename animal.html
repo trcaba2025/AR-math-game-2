@@ -3,19 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์แสนสนุก</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์แสนสนุก (เวอร์ชันแก้ไขลากไม่หลุด)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
     <style>
-        body {
-            margin: 0; padding: 0; overflow: hidden;
-            background-color: #000; font-family: 'Sarabun', sans-serif; user-select: none;
-        }
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #000; font-family: 'Sarabun', sans-serif; user-select: none; }
         #video-container { position: relative; width: 100vw; height: 100vh; }
         video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
@@ -58,7 +55,6 @@ const canvasCtx = canvasElement.getContext('2d');
 const permissionOverlay = document.getElementById('permission-overlay');
 const errorText = document.getElementById('error-text');
 
-// --- คลังข้อมูลคำศัพท์และรูปภาพสัตว์ (Emoji แทนรูปภาพเพื่อความสะดวก ไม่ต้องโหลดไฟล์ภาพแยก) ---
 const animalPool = [
     { id: 'dog', emoji: '🐶', th: 'สุนัข', en: 'Dog' },
     { id: 'cat', emoji: '🐱', th: 'แมว', en: 'Cat' },
@@ -73,15 +69,16 @@ const animalPool = [
 let currentQuestion = 1;
 const totalQuestions = 5;
 let score = 0;
-let gameState = 'PLAYING'; // PLAYING, FEEDBACK, GAMEOVER
+let gameState = 'PLAYING'; 
 let feedbackText = '';
 let feedbackColor = '#2ec4b6';
 
-let targetAnimals = []; // ฝั่งซ้าย (รูปสัตว์)
-let vocabBlocks = [];   // ฝั่งขวา (คำศัพท์)
+let targetAnimals = []; 
+let vocabBlocks = [];   
 
 let draggedBlockIndex = null;
-let pinchThreshold = 0.04;
+// [ปรับปรุง] เพิ่มระยะให้จับติดมือแน่นขึ้น ไม่หลุดง่ายตอนลากผ่านจอกลาง
+let pinchThreshold = 0.055; 
 let isPinching = false;
 
 const TARGET_SIZE = 110;
@@ -95,45 +92,36 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
-// สุ่มเลือกสัตว์ 4 ตัวมาทำโจทย์ในรอบนั้นๆ
 function generateRound() {
     gameState = 'PLAYING';
-    
-    // Shuffle เลือกสัตว์แบบไม่ซ้ำมา 4 ชนิด
     let shuffledPool = [...animalPool].sort(() => Math.random() - 0.5);
     let selectedAnimals = shuffledPool.slice(0, 4);
 
-    // ฝั่งซ้าย: การ์ดรูปสัตว์
     targetAnimals = selectedAnimals.map((animal) => ({
         ...animal,
         matched: false,
         x: 0, y: 0
     }));
 
-    // ฝั่งขวา: บล็อกคำศัพท์รวมไทย-อังกฤษ
     vocabBlocks = [];
     selectedAnimals.forEach(animal => {
         vocabBlocks.push({ id: animal.id, type: 'th', text: animal.th, x: 0, y: 0, homeX: 0, homeY: 0, matched: false });
         vocabBlocks.push({ id: animal.id, type: 'en', text: animal.en, x: 0, y: 0, homeX: 0, homeY: 0, matched: false });
     });
-    // สับเปลี่ยนตำแหน่งบล็อกคำศัพท์ไม่ให้เรียงตรงกับสัตว์
     vocabBlocks.sort(() => Math.random() - 0.5);
 
     initPositions();
 }
 
-// คำนวณพิกัดหน้าจอ แบ่งฝั่ง ซ้าย-ขวา
 function initPositions() {
     const startY = 120;
     const spacingY = 130;
 
-    // ตั้งพิกัดการ์ดสัตว์ฝั่งซ้าย
     targetAnimals.forEach((animal, idx) => {
         animal.x = 120; 
         animal.y = startY + (idx * spacingY);
     });
 
-    // ตั้งพิกัดบล็อกคำศัพท์ฝั่งขวา (แบ่งเป็นสองคอลัมน์เล็กๆ ในฝั่งขวา)
     vocabBlocks.forEach((block, idx) => {
         let col = idx % 2;
         let row = Math.floor(idx / 2);
@@ -144,7 +132,6 @@ function initPositions() {
         block.homeX = targetX;
         block.homeY = targetY;
 
-        // ถ้ายังไม่ได้จับคู่สำเร็จ ให้กลับไปอยู่ที่เดิม
         if (!block.matched) {
             block.x = targetX;
             block.y = targetY;
@@ -155,7 +142,6 @@ function initPositions() {
 function drawGame(handLandmarks) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    // 1. แถบสถานะด้านบน
     canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     canvasCtx.fillRect(0, 0, canvasElement.width, 60);
     
@@ -172,7 +158,6 @@ function drawGame(handLandmarks) {
     canvasCtx.fillStyle = '#2ecc71';
     canvasCtx.fillText(`⭐ คะแนน: ${score}`, canvasElement.width - 30, 38);
 
-    // 2. วาดช่องเป้าหมายฝั่งซ้าย (รูปสัตว์)
     targetAnimals.forEach(animal => {
         canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         canvasCtx.beginPath();
@@ -182,21 +167,19 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
-        // วาดรูปสัตว์ (Emoji)
         canvasCtx.font = '65px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(animal.emoji, animal.x + TARGET_SIZE/2, animal.y + TARGET_SIZE/2);
     });
 
-    // 3. วาดบล็อกคำศัพท์ฝั่งขวา
     vocabBlocks.forEach((block, index) => {
         if (block.matched) {
-            canvasCtx.fillStyle = '#2ecc71'; // สีเขียวถ้าถูกแล้ว
+            canvasCtx.fillStyle = '#2ecc71'; 
         } else if (draggedBlockIndex === index) {
-            canvasCtx.fillStyle = '#f1c40f'; // สีเหลืองตอนกำลังลาก
+            canvasCtx.fillStyle = '#f1c40f'; 
         } else {
-            canvasCtx.fillStyle = block.type === 'th' ? '#3498db' : '#9b59b6'; // แยกสี ไทย-อังกฤษ
+            canvasCtx.fillStyle = block.type === 'th' ? '#3498db' : '#9b59b6'; 
         }
 
         canvasCtx.beginPath();
@@ -206,7 +189,6 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
-        // ข้อความคำศัพท์
         canvasCtx.fillStyle = '#ffffff';
         canvasCtx.font = 'bold 20px Sarabun';
         canvasCtx.textAlign = 'center';
@@ -214,7 +196,6 @@ function drawGame(handLandmarks) {
         canvasCtx.fillText(block.text, block.x + VOCAB_W/2, block.y + VOCAB_H/2);
     });
 
-    // วาดหน้าต่างแจ้งเตือน Feedback
     if (gameState === 'FEEDBACK') {
         canvasCtx.fillStyle = 'rgba(0,0,0,0.4)';
         canvasCtx.fillRect(0, 60, canvasElement.width, canvasElement.height);
@@ -246,7 +227,6 @@ function processHandTracking(landmarks) {
     const pinchY = (thumb.y + indexFinger.y) / 2;
     const distance = Math.sqrt(Math.pow(landmarks[4].x - landmarks[8].x, 2) + Math.pow(landmarks[4].y - landmarks[8].y, 2));
 
-    // ตัวชี้ตำแหน่งมือบนจอ
     canvasCtx.beginPath();
     canvasCtx.arc(pinchX, pinchY, 14, 0, Math.PI * 2);
     canvasCtx.strokeStyle = distance < pinchThreshold ? '#ff3366' : '#ffffff';
@@ -255,10 +235,8 @@ function processHandTracking(landmarks) {
 
     if (gameState !== 'PLAYING') return;
 
-    // การลากวางคำศัพท์ด้วยการจีบนิ้ว
     if (distance < pinchThreshold) {
         if (!isPinching) {
-            // เช็คว่าจีบโดนบล็อกคำศัพท์ตัวไหน (และต้องเป็นตัวที่ยังจับคู่ไม่สำเร็จ)
             vocabBlocks.forEach((block, idx) => {
                 if (!block.matched && pinchX > block.x && pinchX < block.x + VOCAB_W && pinchY > block.y && pinchY < block.y + VOCAB_H) {
                     draggedBlockIndex = idx;
@@ -266,52 +244,43 @@ function processHandTracking(landmarks) {
                 }
             });
         } else if (draggedBlockIndex !== null) {
-            // ขยับบล็อกตามมือลาก
             vocabBlocks[draggedBlockIndex].x = pinchX - VOCAB_W / 2;
             vocabBlocks[draggedBlockIndex].y = pinchY - VOCAB_H / 2;
         }
     } else {
-        // เมื่อปล่อยมือ: ตรวจสอบการจับคู่คำตอบทันที
         if (isPinching && draggedBlockIndex !== null) {
             let currentBlock = vocabBlocks[draggedBlockIndex];
             let matchedTarget = null;
 
-            // ตรวจสอบว่าบล็อกถูกปล่อยลงบนพื้นที่รูปสัตว์ตัวไหนหรือไม่
+            // [ปรับปรุง] ขยายขอบเขต Hitbox ตัวรับเป้าหมายให้กว้างขึ้น เพื่อดึงดูดคำเข้าหาตัวสัตว์ได้ง่ายขึ้น
             targetAnimals.forEach(animal => {
-                if (pinchX > animal.x && pinchX < animal.x + TARGET_SIZE && pinchY > animal.y && pinchY < animal.y + TARGET_SIZE) {
+                if (pinchX > animal.x - 40 && pinchX < animal.x + TARGET_SIZE + 150 && pinchY > animal.y - 30 && pinchY < animal.y + TARGET_SIZE + 60) {
                     matchedTarget = animal;
                 }
             });
 
             if (matchedTarget) {
-                // เงื่อนไข: ถ้า ID ของคำศัพท์ ตรงกับ ID ของสัตว์ชนิดนั้นเป๊ะ (จับคู่ถูกต้อง)
                 if (currentBlock.id === matchedTarget.id) {
                     currentBlock.matched = true;
                     score += 10;
                     
-                    // ปรับตำแหน่งให้คำศัพท์เข้าไปแปะอยู่ติดตัวสัตว์สวยงาม
                     currentBlock.x = matchedTarget.x + (currentBlock.type === 'th' ? -25 : 100);
                     currentBlock.y = matchedTarget.y + TARGET_SIZE + 5;
 
                     checkRoundComplete();
                 } else {
-                    // ===================================================
-                    // [จุดแก้ไขสำคัญตามสั่ง] ถ้าจับคู่ไม่ถูก จะแจ้งเตือนแล้วดีดกลับที่เดิม
-                    // ===================================================
                     gameState = 'FEEDBACK';
                     feedbackText = '❌ ลองจับคู่ใหม่อีกครั้งนะจ๊ะ! ❌';
                     feedbackColor = '#e71d36';
 
-                    // สั่งให้ดีดกลับไปตำแหน่งเริ่มต้นฝั่งขวา
                     currentBlock.x = currentBlock.homeX;
                     currentBlock.y = currentBlock.homeY;
 
                     setTimeout(() => { 
                         if(gameState === 'FEEDBACK') gameState = 'PLAYING'; 
-                    }, 1500);
+                    }, 1200);
                 }
             } else {
-                // ปล่อยนอกพื้นที่เป้าหมาย ให้ดีดกลับบ้านฝั่งขวาเงียบๆ
                 currentBlock.x = currentBlock.homeX;
                 currentBlock.y = currentBlock.homeY;
             }
@@ -321,7 +290,6 @@ function processHandTracking(landmarks) {
     }
 }
 
-// ตรวจสอบว่าในรอบนั้นๆ เด็กๆ จับคู่บล็อกคำศัพท์ครบหมดทุกอันหรือยัง
 function checkRoundComplete() {
     let allDone = vocabBlocks.every(b => b.matched);
     if (allDone) {
@@ -336,7 +304,7 @@ function checkRoundComplete() {
             } else {
                 gameState = 'GAMEOVER';
             }
-        }, 2500);
+        }, 2200);
     }
 }
 
