@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันขยายคลังภาพ 20 ตัว + ระบบเสียง)</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันแก้ไขการซ้อนทับเด็ดขาด)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
@@ -61,77 +61,61 @@ const canvasCtx = canvasElement.getContext('2d');
 const permissionOverlay = document.getElementById('permission-overlay');
 const errorText = document.getElementById('error-text');
 
-// 🎶 1. สร้างระบบออดิโอสังเคราะห์ (Web Audio API) สำหรับเปิดบนเว็บได้ทันที ไม่ต้องกลัวไฟล์เสียงพังหรือโหลดช้า
+// ระบบออดิโอสังเคราะห์ (Web Audio API) สำหรับดนตรีประกอบและเอฟเฟกต์
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-// ฟังก์ชันสร้างเสียงเพลงบรรเลงคลอเบาๆ แฟนตาซี
 let bgmInterval;
 function playBGM() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // โน้ต Do-Re-Mi
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
     let index = 0;
     
     bgmInterval = setInterval(() => {
         if (gameState === 'GAMEOVER') { clearInterval(bgmInterval); return; }
-        
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
-        
-        osc.type = 'triangle'; // เสียงนุ่มๆ ฟินๆ ไม่หนวกหู
+        osc.type = 'triangle';
         osc.frequency.setValueAtTime(notes[index % notes.length], audioCtx.currentTime);
-        
-        gain.gain.setValueAtTime(0.04, audioCtx.currentTime); // เปิดคลอเบามากๆ สบายหู
+        gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
-        
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.8);
-        
-        index += Math.floor(Math.random() * 3) + 1; // สุ่มจังหวะดนตรีเปลี่ยนไปเรื่อยๆ
+        index += Math.floor(Math.random() * 3) + 1;
     }, 600);
 }
 
-// ฟังก์ชันสร้างเสียงเอฟเฟกต์เมื่อตอบถูก (เสียง ปิ๊งป่อง ใสๆ สูงๆ)
 function playCorrectSound() {
     let osc1 = audioCtx.createOscillator();
     let osc2 = audioCtx.createOscillator();
     let gain = audioCtx.createGain();
-    
     osc1.type = 'sine'; osc2.type = 'sine';
-    osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime); // โน้ต C5
-    osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // โน้ต E5
-    
+    osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+    osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
     gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-    
     osc1.connect(gain); osc2.connect(gain);
     gain.connect(audioCtx.destination);
-    
     osc1.start(); osc2.start();
     osc1.stop(audioCtx.currentTime + 0.4); osc2.stop(audioCtx.currentTime + 0.4);
 }
 
-// ฟังก์ชันสร้างเสียงเอฟเฟกต์เมื่อตอบผิด (เสียง หึ่งๆ ต่ำๆ สั้นๆ)
 function playWrongSound() {
     let osc = audioCtx.createOscillator();
     let gain = audioCtx.createGain();
-    
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(120, audioCtx.currentTime); // ความถี่ต่ำมาก
+    osc.frequency.setValueAtTime(120, audioCtx.currentTime);
     osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.25);
-    
     gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
     gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-    
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
     osc.stop(audioCtx.currentTime + 0.25);
 }
 
-
-// 🦁 2. ขยายคลังข้อมูลเพิ่มขึ้นเป็น 20 ตัว!! ลดความซ้ำซ้อน สุ่มได้หลากหลายสะใจ
+// คลังข้อมูลสัตว์ 20 ตัว
 const animalPool = [
     { id: 'dog', emoji: '🐶', th: 'สุนัข', en: 'Dog' },
     { id: 'cat', emoji: '🐱', th: 'แมว', en: 'Cat' },
@@ -141,7 +125,6 @@ const animalPool = [
     { id: 'monkey', emoji: '🐵', th: 'ลิง', en: 'Monkey' },
     { id: 'rabbit', emoji: '🐰', th: 'กระต่าย', en: 'Rabbit' },
     { id: 'frog', emoji: '🐸', th: 'กบ', en: 'Frog' },
-    // เพิ่มเติมอีก 12 ตัวใหม่!
     { id: 'tiger', emoji: '🐯', th: 'เสือ', en: 'Tiger' },
     { id: 'bear', emoji: '🐻', th: 'หมี', en: 'Bear' },
     { id: 'pig', emoji: '🐷', th: 'หมู', en: 'Pig' },
@@ -171,13 +154,14 @@ let draggedBlockIndex = null;
 let pinchThreshold = 0.085; 
 let isPinching = false;
 
-const TARGET_SIZE = 90;
-const VOCAB_W = 140;
-const VOCAB_H = 42;
+// 🎯 ปรับขนาดโมดูลให้กระชับขึ้น เพื่อเพิ่มพื้นที่ว่างแนวตั้งอย่างสมบูรณ์แบบ
+const TARGET_SIZE = 80;  // ปรับขนาดกรอบสัตว์ให้กะทัดรัดขึ้นเล็กน้อย
+const VOCAB_W = 125;     // ปรับความกว้างกล่องศัพท์ให้สมดุล
+const VOCAB_H = 36;      // ลดความหนากล่องศัพท์ลงเพื่อไม่ให้เบียดข้อล่าง
 
 function selectMode(mode) {
     gameMode = mode;
-    playBGM(); // เริ่มเล่นดนตรีประกอบทันทีเมื่อคุณครูคลิกเลือกโหมดภาษา
+    playBGM();
     requestCamera();
 }
 
@@ -190,7 +174,6 @@ window.addEventListener('resize', resizeCanvas);
 
 function generateRound() {
     gameState = 'PLAYING';
-    // สุ่มภาพจากกองกลาง 20 ตัว ออกมาใช้ทีละ 4 ตัวไม่ซ้ำกันในแต่ละรอบเกม
     let shuffledPool = [...animalPool].sort(() => Math.random() - 0.5);
     let selectedAnimals = shuffledPool.slice(0, 4);
 
@@ -215,17 +198,22 @@ function generateRound() {
 
 function initPositions() {
     const screenCenterX = canvasElement.width / 2;
-    const startY = 120;
-    const spacingY = 150; 
+    
+    // 🎯 [จุดแก้ไขสำคัญ] ปรับจุดเริ่มต้นและเพิ่มระยะห่างระหว่างข้อ (spacingY) ให้กว้างขึ้นเป็น 170 พิกเซล
+    // ช่วยแยกแต่ละข้อออกจากกันอย่างเด็ดขาด บล็อกข้อบนดิ่งลงมาเท่าไหร่ก็ไม่มีวันไปโดนรูปข้อล่างครับ
+    const startY = 105;
+    const spacingY = 170; 
 
+    // วางกลุ่มรูปสัตว์กลางจอฝั่งซ้าย
     targetAnimals.forEach((animal, idx) => {
-        animal.x = screenCenterX - 210; 
+        animal.x = screenCenterX - 230; 
         animal.y = startY + (idx * spacingY);
     });
 
+    // วางกลุ่มคำศัพท์กลางจอฝั่งขวา
     vocabBlocks.forEach((block, idx) => {
-        block.homeX = screenCenterX + 55;
-        block.homeY = startY + (idx * spacingY) + 25; 
+        block.homeX = screenCenterX + 80;
+        block.homeY = startY + (idx * spacingY) + 20; 
 
         if (!block.matched) {
             block.x = block.homeX;
@@ -258,13 +246,13 @@ function drawGame(handLandmarks) {
     targetAnimals.forEach(animal => {
         canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         canvasCtx.beginPath();
-        canvasCtx.roundRect(animal.x, animal.y, TARGET_SIZE, TARGET_SIZE, 20);
+        canvasCtx.roundRect(animal.x, animal.y, TARGET_SIZE, TARGET_SIZE, 18);
         canvasCtx.fill();
         canvasCtx.lineWidth = 4;
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
-        canvasCtx.font = '52px Sarabun';
+        canvasCtx.font = '46px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(animal.emoji, animal.x + TARGET_SIZE/2, animal.y + TARGET_SIZE/2);
@@ -281,14 +269,14 @@ function drawGame(handLandmarks) {
         }
 
         canvasCtx.beginPath();
-        canvasCtx.roundRect(block.x, block.y, VOCAB_W, VOCAB_H, 12);
+        canvasCtx.roundRect(block.x, block.y, VOCAB_W, VOCAB_H, 10);
         canvasCtx.fill();
         canvasCtx.lineWidth = 2.5;
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
         canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.font = 'bold 18px Sarabun';
+        canvasCtx.font = 'bold 16px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(block.text, block.x + VOCAB_W/2, block.y + VOCAB_H/2);
@@ -355,7 +343,7 @@ function processHandTracking(landmarks) {
             let matchedTarget = null;
 
             targetAnimals.forEach(animal => {
-                if (pinchX > animal.x - 40 && pinchX < animal.x + TARGET_SIZE + 80 && pinchY > animal.y - 30 && pinchY < animal.y + TARGET_SIZE + 40) {
+                if (pinchX > animal.x - 50 && pinchX < animal.x + TARGET_SIZE + 90 && pinchY > animal.y - 40 && pinchY < animal.y + TARGET_SIZE + 50) {
                     matchedTarget = animal;
                 }
             });
@@ -364,14 +352,15 @@ function processHandTracking(landmarks) {
                 if (currentBlock.id === matchedTarget.id) {
                     currentBlock.matched = true;
                     score += 10;
-                    playCorrectSound(); // 🔔 ส่งเสียงเอฟเฟกต์ตอบถูก
+                    playCorrectSound(); 
                     
+                    // 🎯 จัดวางบล็อกให้อยู่กึ่งกลางใต้ภาพสัตว์พอดี และเว้นช่องไฟลงมาอย่างปลอดภัย ไม่ชนข้อถัดไปแน่นอน
                     currentBlock.x = matchedTarget.x + (TARGET_SIZE - VOCAB_W) / 2;
-                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 25; 
+                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 18; 
 
                     checkRoundComplete();
                 } else {
-                    playWrongSound(); // 💥 ส่งเสียงเอฟเฟกต์ตอบผิด
+                    playWrongSound(); 
                     gameState = 'FEEDBACK';
                     feedbackText = '❌ ลองจับคู่ใหม่อีกครั้งนะจ๊ะ! ❌';
                     feedbackColor = '#e71d36';
