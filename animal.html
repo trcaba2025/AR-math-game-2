@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันคำศัพท์อยู่ใต้ภาพ + เว้นระยะห่าง)</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันขยายคลังภาพ 20 ตัว + ระบบเสียง)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
@@ -40,7 +40,7 @@
     <div id="permission-overlay">
         <h1 style="font-size: 42px; margin-bottom: 5px; color: #f1c40f;">🦁 เกม AR จับคู่คำศัพท์สัตว์แสนสนุก 🐥</h1>
         <p style="font-size: 20px; max-width: 600px; color: #f5f6fa; margin-bottom: 10px;">
-            กรุณาเลือกโหมดภาษาที่ต้องการให้เด็กๆ เล่นจับคู่ครับคุณครู
+            กรุณาเลือกโหมดภาษาที่ต้องการให้เด็กๆ เล่นจับคู่ครับคุณครู (เปิดลำโพงด้วยนะจ๊ะ 🔊)
         </p>
         <div class="mode-container">
             <button class="btn-mode btn-th" onclick="selectMode('th')">🇹🇭 โหมดภาษาไทย</button>
@@ -61,6 +61,77 @@ const canvasCtx = canvasElement.getContext('2d');
 const permissionOverlay = document.getElementById('permission-overlay');
 const errorText = document.getElementById('error-text');
 
+// 🎶 1. สร้างระบบออดิโอสังเคราะห์ (Web Audio API) สำหรับเปิดบนเว็บได้ทันที ไม่ต้องกลัวไฟล์เสียงพังหรือโหลดช้า
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// ฟังก์ชันสร้างเสียงเพลงบรรเลงคลอเบาๆ แฟนตาซี
+let bgmInterval;
+function playBGM() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // โน้ต Do-Re-Mi
+    let index = 0;
+    
+    bgmInterval = setInterval(() => {
+        if (gameState === 'GAMEOVER') { clearInterval(bgmInterval); return; }
+        
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        
+        osc.type = 'triangle'; // เสียงนุ่มๆ ฟินๆ ไม่หนวกหู
+        osc.frequency.setValueAtTime(notes[index % notes.length], audioCtx.currentTime);
+        
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime); // เปิดคลอเบามากๆ สบายหู
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.8);
+        
+        index += Math.floor(Math.random() * 3) + 1; // สุ่มจังหวะดนตรีเปลี่ยนไปเรื่อยๆ
+    }, 600);
+}
+
+// ฟังก์ชันสร้างเสียงเอฟเฟกต์เมื่อตอบถูก (เสียง ปิ๊งป่อง ใสๆ สูงๆ)
+function playCorrectSound() {
+    let osc1 = audioCtx.createOscillator();
+    let osc2 = audioCtx.createOscillator();
+    let gain = audioCtx.createGain();
+    
+    osc1.type = 'sine'; osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime); // โน้ต C5
+    osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // โน้ต E5
+    
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+    
+    osc1.connect(gain); osc2.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc1.start(); osc2.start();
+    osc1.stop(audioCtx.currentTime + 0.4); osc2.stop(audioCtx.currentTime + 0.4);
+}
+
+// ฟังก์ชันสร้างเสียงเอฟเฟกต์เมื่อตอบผิด (เสียง หึ่งๆ ต่ำๆ สั้นๆ)
+function playWrongSound() {
+    let osc = audioCtx.createOscillator();
+    let gain = audioCtx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, audioCtx.currentTime); // ความถี่ต่ำมาก
+    osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.25);
+    
+    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+}
+
+
+// 🦁 2. ขยายคลังข้อมูลเพิ่มขึ้นเป็น 20 ตัว!! ลดความซ้ำซ้อน สุ่มได้หลากหลายสะใจ
 const animalPool = [
     { id: 'dog', emoji: '🐶', th: 'สุนัข', en: 'Dog' },
     { id: 'cat', emoji: '🐱', th: 'แมว', en: 'Cat' },
@@ -69,7 +140,20 @@ const animalPool = [
     { id: 'elephant', emoji: '🐘', th: 'ช้าง', en: 'Elephant' },
     { id: 'monkey', emoji: '🐵', th: 'ลิง', en: 'Monkey' },
     { id: 'rabbit', emoji: '🐰', th: 'กระต่าย', en: 'Rabbit' },
-    { id: 'frog', emoji: '🐸', th: 'กบ', en: 'Frog' }
+    { id: 'frog', emoji: '🐸', th: 'กบ', en: 'Frog' },
+    // เพิ่มเติมอีก 12 ตัวใหม่!
+    { id: 'tiger', emoji: '🐯', th: 'เสือ', en: 'Tiger' },
+    { id: 'bear', emoji: '🐻', th: 'หมี', en: 'Bear' },
+    { id: 'pig', emoji: '🐷', th: 'หมู', en: 'Pig' },
+    { id: 'cow', emoji: '🐮', th: 'วัว', en: 'Cow' },
+    { id: 'sheep', emoji: '🐑', th: 'แกะ', en: 'Sheep' },
+    { id: 'horse', emoji: '🐴', th: 'ม้า', en: 'Horse' },
+    { id: 'penguin', emoji: '🐧', th: 'เพนกวิน', en: 'Penguin' },
+    { id: 'turtle', emoji: '🐢', th: 'เต่า', en: 'Turtle' },
+    { id: 'duck', emoji: '🦆', th: 'เป็ด', en: 'Duck' },
+    { id: 'chicken', emoji: '🐔', th: 'ไก่', en: 'Chicken' },
+    { id: 'bee', emoji: '🐝', th: 'ผึ้ง', en: 'Bee' },
+    { id: 'fish', emoji: '🐟', th: 'ปลา', en: 'Fish' }
 ];
 
 let gameMode = 'th'; 
@@ -87,13 +171,13 @@ let draggedBlockIndex = null;
 let pinchThreshold = 0.085; 
 let isPinching = false;
 
-// ปรับสัดส่วนขนาดและระยะห่างแนวตั้ง (Spacing) ให้สมดุลกับจอภาพ
 const TARGET_SIZE = 90;
 const VOCAB_W = 140;
 const VOCAB_H = 42;
 
 function selectMode(mode) {
     gameMode = mode;
+    playBGM(); // เริ่มเล่นดนตรีประกอบทันทีเมื่อคุณครูคลิกเลือกโหมดภาษา
     requestCamera();
 }
 
@@ -106,6 +190,7 @@ window.addEventListener('resize', resizeCanvas);
 
 function generateRound() {
     gameState = 'PLAYING';
+    // สุ่มภาพจากกองกลาง 20 ตัว ออกมาใช้ทีละ 4 ตัวไม่ซ้ำกันในแต่ละรอบเกม
     let shuffledPool = [...animalPool].sort(() => Math.random() - 0.5);
     let selectedAnimals = shuffledPool.slice(0, 4);
 
@@ -131,15 +216,13 @@ function generateRound() {
 function initPositions() {
     const screenCenterX = canvasElement.width / 2;
     const startY = 120;
-    const spacingY = 150; // ขยายช่องไฟแนวตั้งเพิ่มขึ้น เพื่อรองรับคำศัพท์ที่จะลงไปอยู่ใต้ภาพแบบหลวมๆ
+    const spacingY = 150; 
 
-    // วางกลุ่มรูปสัตว์กลางจอฝั่งซ้าย
     targetAnimals.forEach((animal, idx) => {
         animal.x = screenCenterX - 210; 
         animal.y = startY + (idx * spacingY);
     });
 
-    // วางกลุ่มคำศัพท์กลางจอฝั่งขวา
     vocabBlocks.forEach((block, idx) => {
         block.homeX = screenCenterX + 55;
         block.homeY = startY + (idx * spacingY) + 25; 
@@ -165,7 +248,7 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillStyle = '#f1c40f';
     const modeText = gameMode === 'th' ? '🇹🇭 ภาษาไทย' : '🇺🇸 ภาษาอังกฤษ';
-    canvasCtx.fillText(`🎯 โหมด: ${modeText} | ลากคำศัพท์ขวา มาวางจับคู่ใต้รูปสัตว์ซ้ายให้ถูกต้อง`, canvasElement.width / 2, 38);
+    canvasCtx.fillText(`🎯 โหมด: ${modeText} | คลังภาพสัตว์ 20 ชนิด | ลากคำศัพท์วางใต้รูปสัตว์ให้ถูกต้อง`, canvasElement.width / 2, 38);
 
     canvasCtx.textAlign = 'right';
     canvasCtx.fillStyle = '#2ecc71';
@@ -271,7 +354,6 @@ function processHandTracking(landmarks) {
             let currentBlock = vocabBlocks[draggedBlockIndex];
             let matchedTarget = null;
 
-            // เช็กการลากชนพิกัดรูปภาพสัตว์ (ปรับขอบเขตให้ลากโดนง่าย)
             targetAnimals.forEach(animal => {
                 if (pinchX > animal.x - 40 && pinchX < animal.x + TARGET_SIZE + 80 && pinchY > animal.y - 30 && pinchY < animal.y + TARGET_SIZE + 40) {
                     matchedTarget = animal;
@@ -282,14 +364,14 @@ function processHandTracking(landmarks) {
                 if (currentBlock.id === matchedTarget.id) {
                     currentBlock.matched = true;
                     score += 10;
+                    playCorrectSound(); // 🔔 ส่งเสียงเอฟเฟกต์ตอบถูก
                     
-                    // [แก้ไขพิกัดตามสั่ง] จัดตำแหน่งบล็อกคำศัพท์ให้อยู่ "ใต้รูปภาพ" 
-                    // และบวกเพิ่มระยะห่างลงมาอีก 25 พิกเซล (ประมาณ 2 นิ้วหน้าจอ) เพื่อไม่ให้ทับรูปภาพเด็ดขาดครับ
                     currentBlock.x = matchedTarget.x + (TARGET_SIZE - VOCAB_W) / 2;
                     currentBlock.y = matchedTarget.y + TARGET_SIZE + 25; 
 
                     checkRoundComplete();
                 } else {
+                    playWrongSound(); // 💥 ส่งเสียงเอฟเฟกต์ตอบผิด
                     gameState = 'FEEDBACK';
                     feedbackText = '❌ ลองจับคู่ใหม่อีกครั้งนะจ๊ะ! ❌';
                     feedbackColor = '#e71d36';
