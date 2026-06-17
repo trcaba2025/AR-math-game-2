@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันคำศัพท์อยู่ใต้ภาพ)</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันคำศัพท์อยู่ใต้ภาพ + เว้นระยะห่าง)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
@@ -87,10 +87,10 @@ let draggedBlockIndex = null;
 let pinchThreshold = 0.085; 
 let isPinching = false;
 
-// ขนาดบล็อกที่สมดุล สัมพันธ์กับช่องว่างใต้ภาพ
-const TARGET_SIZE = 95;
-const VOCAB_W = 145;
-const VOCAB_H = 45;
+// ปรับสัดส่วนขนาดและระยะห่างแนวตั้ง (Spacing) ให้สมดุลกับจอภาพ
+const TARGET_SIZE = 90;
+const VOCAB_W = 140;
+const VOCAB_H = 42;
 
 function selectMode(mode) {
     gameMode = mode;
@@ -130,8 +130,8 @@ function generateRound() {
 
 function initPositions() {
     const screenCenterX = canvasElement.width / 2;
-    const startY = 130;
-    const spacingY = 145; // เพิ่มระยะห่างแถวตั้งเล็กน้อย เพื่อให้คำศัพท์ไปอยู่ใต้ภาพได้แบบสบายๆ ไม่เบียดกัน
+    const startY = 120;
+    const spacingY = 150; // ขยายช่องไฟแนวตั้งเพิ่มขึ้น เพื่อรองรับคำศัพท์ที่จะลงไปอยู่ใต้ภาพแบบหลวมๆ
 
     // วางกลุ่มรูปสัตว์กลางจอฝั่งซ้าย
     targetAnimals.forEach((animal, idx) => {
@@ -142,7 +142,7 @@ function initPositions() {
     // วางกลุ่มคำศัพท์กลางจอฝั่งขวา
     vocabBlocks.forEach((block, idx) => {
         block.homeX = screenCenterX + 55;
-        block.homeY = startY + (idx * spacingY) + 25; // วางระนาบเดียวกันในตอนเริ่มต้นให้เด็กๆ สังเกตง่าย
+        block.homeY = startY + (idx * spacingY) + 25; 
 
         if (!block.matched) {
             block.x = block.homeX;
@@ -165,7 +165,7 @@ function drawGame(handLandmarks) {
     canvasCtx.textAlign = 'center';
     canvasCtx.fillStyle = '#f1c40f';
     const modeText = gameMode === 'th' ? '🇹🇭 ภาษาไทย' : '🇺🇸 ภาษาอังกฤษ';
-    canvasCtx.fillText(`🎯 โหมด: ${modeText} | ลากคำศัพท์มาวางจับคู่ใต้รูปภาพให้ถูกต้อง`, canvasElement.width / 2, 38);
+    canvasCtx.fillText(`🎯 โหมด: ${modeText} | ลากคำศัพท์ขวา มาวางจับคู่ใต้รูปสัตว์ซ้ายให้ถูกต้อง`, canvasElement.width / 2, 38);
 
     canvasCtx.textAlign = 'right';
     canvasCtx.fillStyle = '#2ecc71';
@@ -181,7 +181,7 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
-        canvasCtx.font = '55px Sarabun';
+        canvasCtx.font = '52px Sarabun';
         canvasCtx.textAlign = 'center';
         canvasCtx.textBaseline = 'middle';
         canvasCtx.fillText(animal.emoji, animal.x + TARGET_SIZE/2, animal.y + TARGET_SIZE/2);
@@ -190,9 +190,9 @@ function drawGame(handLandmarks) {
     // วาดบล็อกคำศัพท์
     vocabBlocks.forEach((block, index) => {
         if (block.matched) {
-            canvasCtx.fillStyle = '#2ecc71'; // จับคู่ถูกเป็นสีเขียว
+            canvasCtx.fillStyle = '#2ecc71'; 
         } else if (draggedBlockIndex === index) {
-            canvasCtx.fillStyle = '#f1c40f'; // ตอนลากเป็นสีเหลือง
+            canvasCtx.fillStyle = '#f1c40f'; 
         } else {
             canvasCtx.fillStyle = gameMode === 'th' ? '#3498db' : '#9b59b6'; 
         }
@@ -271,7 +271,7 @@ function processHandTracking(landmarks) {
             let currentBlock = vocabBlocks[draggedBlockIndex];
             let matchedTarget = null;
 
-            // เช็กการลากเข้าชนพิกัดรูปภาพสัตว์
+            // เช็กการลากชนพิกัดรูปภาพสัตว์ (ปรับขอบเขตให้ลากโดนง่าย)
             targetAnimals.forEach(animal => {
                 if (pinchX > animal.x - 40 && pinchX < animal.x + TARGET_SIZE + 80 && pinchY > animal.y - 30 && pinchY < animal.y + TARGET_SIZE + 40) {
                     matchedTarget = animal;
@@ -283,9 +283,10 @@ function processHandTracking(landmarks) {
                     currentBlock.matched = true;
                     score += 10;
                     
-                    // [แก้ไขจุดสำคัญ] จัดตำแหน่งบล็อกเมื่อจับคู่ถูก ให้เลื่อนไปจัดระเบียบอยู่ "ใต้รูปภาพสัตว์" พอดีเป๊ะ
+                    // [แก้ไขพิกัดตามสั่ง] จัดตำแหน่งบล็อกคำศัพท์ให้อยู่ "ใต้รูปภาพ" 
+                    // และบวกเพิ่มระยะห่างลงมาอีก 25 พิกเซล (ประมาณ 2 นิ้วหน้าจอ) เพื่อไม่ให้ทับรูปภาพเด็ดขาดครับ
                     currentBlock.x = matchedTarget.x + (TARGET_SIZE - VOCAB_W) / 2;
-                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 6; 
+                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 25; 
 
                     checkRoundComplete();
                 } else {
