@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันภาพการ์ตูนเสมือนจริง แยกแยะง่าย)</title>
+    <title>เกม AR จับคู่คำศัพท์สัตว์ (เวอร์ชันแก้ไขลิงก์ภาพสัตว์ตรงตามศัพท์)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght=400;700&display=swap" rel="stylesheet">
@@ -40,7 +40,7 @@
     <div id="permission-overlay">
         <h1 style="font-size: 42px; margin-bottom: 5px; color: #f1c40f;">🦁 เกม AR จับคู่คำศัพท์สัตว์แสนสนุก 🐥</h1>
         <p style="font-size: 20px; max-width: 600px; color: #f5f6fa; margin-bottom: 10px;">
-            เวอร์ชันอัปเกรด: ภาพการ์ตูนเสมือนจริง แยกแยะง่าย ไม่สับสนแน่นอนครับคุณครู! 😊
+            แก้ไขเรียบร้อย: อัปเดตลิงก์รูปภาพสัตว์ตรงตามคำศัพท์ 100% แล้วครับคุณครู! 😊
         </p>
         <div class="mode-container">
             <button class="btn-mode btn-th" onclick="selectMode('th')">🇹🇭 โหมดภาษาไทย</button>
@@ -104,31 +104,31 @@ function playWrongSound() {
     osc.start(); osc.stop(audioCtx.currentTime + 0.25);
 }
 
-// 🎯 เปลี่ยนจาก Emoji เป็น ลิงก์ภาพการ์ตูนเวกเตอร์ที่มีลายเส้นเสมือนจริง ชัดเจน และไม่ซ้ำซ้อนกันแน่นอนครับ!
+// 🎯 คลังข้อมูลลิงก์รูปภาพการ์ตูนสัตว์จาก Google Noto Emoji (CDN เสถียรสูง ภาพตรงตามศัพท์แน่นอนครับ)
 const animalPool = [
-    { id: 'dog', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616408.png', th: 'สุนัข', en: 'Dog' },
-    { id: 'cat', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616430.png', th: 'แมว', en: 'Cat' },
-    { id: 'lion', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616412.png', th: 'สิงโต', en: 'Lion' },
-    { id: 'bird', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616613.png', th: 'นก', en: 'Bird' },
-    { id: 'elephant', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616432.png', th: 'ช้าง', en: 'Elephant' },
-    { id: 'monkey', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616417.png', th: 'ลิง', en: 'Monkey' },
-    { id: 'rabbit', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616442.png', th: 'กระต่าย', en: 'Rabbit' },
-    { id: 'frog', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616656.png', th: 'กบ', en: 'Frog' },
-    { id: 'tiger', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616422.png', th: 'เสือ', en: 'Tiger' },
-    { id: 'bear', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616438.png', th: 'หมี', en: 'Bear' },
-    { id: 'pig', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616427.png', th: 'หมู', en: 'Pig' },
-    { id: 'cow', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616550.png', th: 'วัว', en: 'Cow' },
-    { id: 'sheep', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616447.png', th: 'แกะ', en: 'Sheep' },
-    { id: 'horse', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616405.png', th: 'ม้า', en: 'Horse' },
-    { id: 'penguin', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616643.png', th: 'เพนกวิน', en: 'Penguin' },
-    { id: 'turtle', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616688.png', th: 'เต่า', en: 'Turtle' },
-    { id: 'duck', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616634.png', th: 'เป็ด', en: 'Duck' },
-    { id: 'chicken', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616618.png', th: 'ไก่', en: 'Chicken' },
-    { id: 'bee', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616676.png', th: 'ผึ้ง', en: 'Bee' },
-    { id: 'fish', imgUrl: 'https://cdn-icons-png.flaticon.com/512/616/616524.png', th: 'ปลา', en: 'Fish' }
+    { id: 'dog', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f436.svg', th: 'สุนัข', en: 'Dog' },
+    { id: 'cat', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f431.svg', th: 'แมว', en: 'Cat' },
+    { id: 'lion', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f981.svg', th: 'สิงโต', en: 'Lion' },
+    { id: 'bird', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f426.svg', th: 'นก', en: 'Bird' },
+    { id: 'elephant', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f418.svg', th: 'ช้าง', en: 'Elephant' },
+    { id: 'monkey', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f435.svg', th: 'ลิง', en: 'Monkey' },
+    { id: 'rabbit', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f430.svg', th: 'กระต่าย', en: 'Rabbit' },
+    { id: 'frog', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f438.svg', th: 'กบ', en: 'Frog' },
+    { id: 'tiger', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f42f.svg', th: 'เสือ', en: 'Tiger' },
+    { id: 'bear', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f43b.svg', th: 'หมี', en: 'Bear' },
+    { id: 'pig', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f437.svg', th: 'หมู', en: 'Pig' },
+    { id: 'cow', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f42e.svg', th: 'วัว', en: 'Cow' },
+    { id: 'sheep', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f411.svg', th: 'แกะ', en: 'Sheep' },
+    { id: 'horse', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f434.svg', th: 'ม้า', en: 'Horse' },
+    { id: 'penguin', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f427.svg', th: 'เพนกวิน', en: 'Penguin' },
+    { id: 'turtle', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f422.svg', th: 'เต่า', en: 'Turtle' },
+    { id: 'duck', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f986.svg', th: 'เป็ด', en: 'Duck' },
+    { id: 'chicken', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f414.svg', th: 'ไก่', en: 'Chicken' },
+    { id: 'bee', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f41d.svg', th: 'ผึ้ง', en: 'Bee' },
+    { id: 'fish', imgUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u1f41f.svg', th: 'ปลา', en: 'Fish' }
 ];
 
-// โหลดรูปภาพไว้ในหน่วยความจำล่วงหน้า เพื่อป้องกันปัญหาภาพกระพริบตอนเล่น
+// โหลดรูปภาพเก็บเข้า Cache ล่วงหน้า
 const imageCache = {};
 animalPool.forEach(animal => {
     const img = new Image();
@@ -151,7 +151,6 @@ let draggedBlockIndex = null;
 let pinchThreshold = 0.085; 
 let isPinching = false;
 
-// โครงสร้างขยับแถวแบบโปร่งพิเศษ แก้ไขเรื่องภาพซ้อนทับกันเด็ดขาด
 const TARGET_SIZE = 80;  
 const VOCAB_W = 125;     
 const VOCAB_H = 36;      
@@ -196,7 +195,7 @@ function generateRound() {
 function initPositions() {
     const screenCenterX = canvasElement.width / 2;
     const startY = 105;
-    const spacingY = 170; // ล็อกช่องไฟแนวตั้งกว้าง 170px ป้องกันการทับซ้อนข้ออื่นเด็ดขาด
+    const spacingY = 170; 
 
     targetAnimals.forEach((animal, idx) => {
         animal.x = screenCenterX - 230; 
@@ -234,7 +233,7 @@ function drawGame(handLandmarks) {
     canvasCtx.fillStyle = '#2ecc71';
     canvasCtx.fillText(`⭐ คะแนน: ${score}`, canvasElement.width - 30, 38);
 
-    // วาดกรอบรูปภาพสัตว์
+    // วาดรูปภาพสัตว์การ์ตูน Google Noto
     targetAnimals.forEach(animal => {
         canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
         canvasCtx.beginPath();
@@ -244,10 +243,9 @@ function drawGame(handLandmarks) {
         canvasCtx.strokeStyle = '#ffffff';
         canvasCtx.stroke();
 
-        // ดึงภาพจาก Cache มาวาดลงในกรอบแทนการใช้ Emoji Text แบบเดิม
         const img = imageCache[animal.id];
         if (img && img.complete) {
-            const padding = 10; // เว้นขอบรูปเล็กน้อยเพื่อความสวยงาม
+            const padding = 10; 
             canvasCtx.drawImage(img, animal.x + padding, animal.y + padding, TARGET_SIZE - (padding * 2), TARGET_SIZE - (padding * 2));
         }
     });
@@ -347,7 +345,7 @@ function processHandTracking(landmarks) {
                     playCorrectSound(); 
                     
                     currentBlock.x = matchedTarget.x + (TARGET_SIZE - VOCAB_W) / 2;
-                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 18; // อยู่ใต้ภาพตัวมันเองพอดี ไม่โดนเบียด
+                    currentBlock.y = matchedTarget.y + TARGET_SIZE + 18; 
 
                     checkRoundComplete();
                 } else {
